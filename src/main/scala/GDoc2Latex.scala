@@ -65,7 +65,7 @@ object GDoc2Latex extends App {
 
 
   def processPlainText(s: String): String =
-    s.replace("“", "``").replace("”", "''").replace("%","\\%")
+    s.replace("“", "``").replace("”", "''").replace("%","\\%").replace("&","\\&")
 
   def processParagraph(out: PrintWriter, p: Paragraph): Unit = {
     out.println(getParagraphText(p) + "\n")
