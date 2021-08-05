@@ -8,7 +8,7 @@ import scala.jdk.CollectionConverters._
 
 object GDoc2Latex extends App {
 
-  val doc = GDocTest.getDocument()
+  val doc = GDocConnection.getDocument()
   val outw: PrintWriter =
     if (args.size==1) new PrintWriter(new FileWriter(new File(args(0))))
     else new PrintWriter(System.out);
