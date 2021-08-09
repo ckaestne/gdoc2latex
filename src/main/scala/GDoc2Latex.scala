@@ -5,12 +5,11 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 
-
 object GDoc2Latex extends App {
 
   val doc = GDocConnection.getDocument()
   val outw: PrintWriter =
-    if (args.size==1) new PrintWriter(new FileWriter(new File(args(0))))
+    if (args.size == 1) new PrintWriter(new FileWriter(new File(args(0))))
     else new PrintWriter(System.out);
 
   process(outw, doc);
@@ -27,16 +26,22 @@ object GDoc2Latex extends App {
     else {
       var text = processPlainText(e.getTextRun.getContent)
       val style = e.getTextRun.getTextStyle
-      if (style != null && style.getBold)
+      //use strikethrough as comment
+      if (style != null && style.getStrikethrough)
+        return None
+      if (style != null && style.getBold && text.trim.nonEmpty)
         text = s"\\textbf{$text}"
-      if (style != null && style.getItalic)
+      if (style != null && style.getItalic && text.trim.nonEmpty)
         text = s"\\emph{$text}"
-      if (style != null && style.getLink != null) {
+      if (style != null && style.getLink != null && text.trim.nonEmpty) {
         val link = style.getLink.getUrl
-        if (link contains "paperpile.com/c/") {
-          val refs = link.drop(link.lastIndexOf("/")+1).split("\\+")
+        val hlink = style.getLink.getHeadingId
+        if (hlink != null) {
+          text = s"\\ref{$hlink}"
+        } else if (link != null && (link contains "paperpile.com/c/")) {
+          val refs = link.drop(link.lastIndexOf("/") + 1).split("\\+")
           text = "\\cite{" + refs.mkString(",") + "}"
-        } else if (!(link contains "paperpile.com/b/"))
+        } else if (link != null && !(link contains "paperpile.com/b/"))
           System.err.println(s"unsupported direct link ${style.getLink.getUrl} for $text")
       }
 
@@ -59,16 +64,21 @@ object GDoc2Latex extends App {
     else {
       val link = e.getTextRun.getTextStyle.getLink.getUrl
       if (link contains "paperpile.com/b/")
-        Some(link.drop(link.lastIndexOf("/")+1))
+        Some(link.drop(link.lastIndexOf("/") + 1))
       else None
     }
 
 
   def processPlainText(s: String): String =
-    s.replace("“", "``").replace("”", "''").replace("%","\\%").replace("&","\\&")
+    s.replace("“", "``").replace("”", "''").replace("’", "'").replace("%", "\\%").replace("&", "\\&")
+
 
   def processParagraph(out: PrintWriter, p: Paragraph): Unit = {
+    if (p.getBullet != null)
+      out.println("\\begin{compactitem}\\item")
     out.println(getParagraphText(p) + "\n")
+    if (p.getBullet != null)
+      out.println("\\end{compactitem}")
   }
 
   def printPaperpileRefs(out: PrintWriter, paragraphs: List[Paragraph]): Unit = {
@@ -93,16 +103,23 @@ object GDoc2Latex extends App {
     for (p: Paragraph <- paragraphs) {
       //      println(c)
       val style = p.getParagraphStyle.getNamedStyleType
-      if ("HEADING_1" == style)
-        out.println(s"\n\\section{${getParagraphText(p)}}\n")
-      else if ("HEADING_2" == style)
-        out.println(s"\n\\subsection{${getParagraphText(p)}}\n")
-      else if ("HEADING_3" == style)
-        out.println(s"\n\\subsubsection{${getParagraphText(p)}}\n")
+      val ptext = getParagraphText(p)
+      if ("HEADING_1" == style && ptext.trim.nonEmpty)
+        out.println(s"\n\\section{${ptext}}\n")
+      else if ("HEADING_2" == style && ptext.trim.nonEmpty)
+        out.println(s"\n\\subsection{${ptext}}\n")
+      else if ("HEADING_3" == style && ptext.trim.nonEmpty)
+        out.println(s"\n\\subsubsection{${ptext}}\n")
       else if ("NORMAL_TEXT" == style)
         processParagraph(out, p)
       else
         System.err.println("unknonw style: " + style)
+
+      val headingId = p.getParagraphStyle.getHeadingId
+      if (headingId != null)
+        out.println(s"\\label{$headingId}")
+
+
     }
     printPaperpileRefs(out, paragraphs)
 
