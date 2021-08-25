@@ -9,11 +9,18 @@ object GDoc2Latex extends App {
 
   val doc = GDocConnection.getDocument()
   val outw: PrintWriter =
-    if (args.size == 1) new PrintWriter(new FileWriter(new File(args(0))))
+    if (args.size >= 1) new PrintWriter(new FileWriter(new File(args(0))))
+    else new PrintWriter(System.out);
+  val outw2: PrintWriter =
+    if (args.size == 2) new PrintWriter(new FileWriter(new File(args(1))))
     else new PrintWriter(System.out);
 
-  process(outw, doc);
+  var _abstract = ""
+  var _title = "title"
+
+  process(outw, outw2, doc);
   outw.close()
+  outw2.close()
 
 
   def getParagraphText(p: Paragraph): String = if (p.getElements == null || isPaperpileRef(p)) "" else {
@@ -76,7 +83,11 @@ object GDoc2Latex extends App {
   def processParagraph(out: PrintWriter, p: Paragraph): Unit = {
     if (p.getBullet != null)
       out.println("\\begin{compactitem}\\item")
-    out.println(getParagraphText(p) + "\n")
+    val text = getParagraphText(p)
+    if (text startsWith "Abstract: ")
+      _abstract = text.drop(10)
+    else
+      out.println(text + "\n")
     if (p.getBullet != null)
       out.println("\\end{compactitem}")
   }
@@ -95,7 +106,7 @@ object GDoc2Latex extends App {
     out.println(s"\\bibitem{$id} $ref")
   }
 
-  def process(out: PrintWriter, doc: Document): Unit = {
+  def process(out: PrintWriter,out2: PrintWriter, doc: Document): Unit = {
     val body = doc.getBody
 
     val paragraphs = body.getContent.asScala.flatMap(se => Option(se.getParagraph)).toList
@@ -104,7 +115,9 @@ object GDoc2Latex extends App {
       //      println(c)
       val style = p.getParagraphStyle.getNamedStyleType
       val ptext = getParagraphText(p)
-      if ("HEADING_1" == style && ptext.trim.nonEmpty)
+      if ("TITLE" == style && ptext.trim.nonEmpty)
+        _title = ptext
+      else if ("HEADING_1" == style && ptext.trim.nonEmpty)
         out.println(s"\n\\section{${ptext}}\n")
       else if ("HEADING_2" == style && ptext.trim.nonEmpty)
         out.println(s"\n\\subsection{${ptext}}\n")
@@ -122,6 +135,9 @@ object GDoc2Latex extends App {
 
     }
     printPaperpileRefs(out, paragraphs)
+
+    out2.println(s"\\newcommand\\papertitle{${_title}}")
+    out2.println(s"\\newcommand\\paperabstract{${_abstract}}")
 
     //    println(doc)
   }
