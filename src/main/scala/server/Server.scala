@@ -3,16 +3,18 @@ package edu.cmu.ckaestne.gdoc2latex.server
 import cask.Response
 import cask.model.StaticFile
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
-import edu.cmu.ckaestne.gdoc2latex.{GDoc2LatexConverter, GDocConnection, Template}
+import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
+import edu.cmu.ckaestne.gdoc2latex.{Context, GDoc2LatexConverter, LatexInput}
 import scalatags.Text.all._
 
-import java.io.File
+import java.io.{BufferedReader, File, InputStreamReader}
 import java.nio.file.{Files, Path, StandardCopyOption}
-import scala.io.Source
+import java.util.stream.Collectors
 
 case class GDocId(docId: String, templateId: Option[String]) {
   def toParam = docId + templateId.map("/" + _).getOrElse("")
 }
+
 object GDocId {
   def from(gdocId: String, templateId: String) =
     GDocId(gdocId, if (templateId != null && templateId != "") Some(templateId) else None)
@@ -34,9 +36,9 @@ object GDoc2LatexWorker {
   def errPath(gdocId: GDocId) = targetDirectory.resolve(gdocId.docId + ".err")
 
 
-  def getLatex(gdocId: GDocId): (String /*Title*/ , String /*latexcode*/ ) = {
+  def getLatex(gdocId: GDocId): LatexInput = {
     println(s"loading gdoc $gdocId")
-    val template = gdocId.templateId.map(Template.loadGdoc).getOrElse(Template.defaultTemplate)
+    val context = gdocId.templateId.map(Context.fromGoogleId).getOrElse(Context.defaultContext)
 
     val doc = GDocConnection.getDocument(gdocId.docId)
 
@@ -46,7 +48,7 @@ object GDoc2LatexWorker {
     }
 
     val ldoc = new GDoc2LatexConverter().convert(doc)
-    (ldoc.title, template.render(ldoc))
+    context.render(ldoc)
   }
 
   /**
@@ -73,19 +75,19 @@ object GDoc2LatexWorker {
    * get the latest document version and compile a PDF if anything has changed
    */
   def updatePDF(gdocId: GDocId): Option[File /*PDF*/ ] = {
-    val (title, latex) = getLatex(gdocId)
+    val input = getLatex(gdocId)
 
     gdocId.docId.synchronized {
       if (texPath(gdocId).toFile.exists()) {
-        val oldTex = Files.readString(texPath(gdocId))
-        if (oldTex == latex) {
+        val oldTex = Files.readAllBytes(texPath(gdocId))
+        if (oldTex == input.mainFileContent) {
           println("file has not changed")
           return getLastPDF(gdocId)
         }
       }
     }
 
-    updatePDFInternal(gdocId, latex)
+    updatePDFInternal(gdocId, input)
   }
 
 
@@ -96,25 +98,27 @@ object GDoc2LatexWorker {
    * @param latex
    * @return
    */
-  private def updatePDFInternal(gdocId: GDocId, latex: String): Option[File /*PDF*/ ] = {
+  private def updatePDFInternal(gdocId: GDocId, input: LatexInput): Option[File /*PDF*/ ] = {
     val workingDirectory = Files.createTempDirectory("gdoc2latex")
-    val texFile = workingDirectory.resolve("main.tex")
-    Files.writeString(texFile, latex)
+    for ((name, content) <- input.files) {
+      val file = workingDirectory.resolve(name)
+      Files.write(file, content)
+    }
     val cmd = Seq("timeout", "60s", "latexmk", "--pdf", "--interaction=nonstopmode", "main.tex")
     val process = new ProcessBuilder(cmd: _*)
       .directory(workingDirectory.toFile).start()
     val out = process.getInputStream
     val err = process.getErrorStream
     val success = process.waitFor() == 0
-    val log = Source.fromInputStream(out).getLines().mkString("\n")
-    val errorLog = Source.fromInputStream(err).getLines().mkString("\n")
+    val log = new BufferedReader(new InputStreamReader(out)).lines().collect(Collectors.joining("\n"))
+    val errorLog = new BufferedReader(new InputStreamReader(err)).lines().collect(Collectors.joining("\n"))
 
     gdocId.docId.synchronized {
       if (success)
         Files.move(workingDirectory.resolve("main.pdf"), pdfPath(gdocId), StandardCopyOption.REPLACE_EXISTING)
       else
         Files.deleteIfExists(pdfPath(gdocId))
-      Files.writeString(texPath(gdocId), latex)
+      Files.write(texPath(gdocId), input.mainFileContent)
       Files.writeString(logPath(gdocId), "> " + cmd.mkString(" ") + "\n\n" + log)
       Files.writeString(errPath(gdocId), errorLog)
     }
@@ -125,13 +129,25 @@ object GDoc2LatexWorker {
     if (success) Some(pdfPath(gdocId).toFile) else None
   }
 
+  def clean(gdocId: GDocId) = {
+    for (file <- List(
+      rawPath(gdocId),
+      pdfPath(gdocId),
+      texPath(gdocId),
+      logPath(gdocId),
+      errPath(gdocId)
+    ))
+      if (Files.exists(file))
+        Files.delete(file)
+  }
+
 }
 
 
 case class Routes() extends cask.MainRoutes {
 
   type Resp = Response[Response.Data]
-  val SERVICE_ACCOUNT_EMAIL = "heroku-server@gdoc2latex.iam.gserviceaccount.com"
+  val SERVICE_ACCOUNT_EMAIL = GDocConnection.serviceAccountCredentials.getClientEmail
 
   private def tt(s: String) = span(s, style := "font-family: Consolas,\"Courier New\",monospace")
 
@@ -180,11 +196,11 @@ case class Routes() extends cask.MainRoutes {
   @cask.get("/latex/:gdocId/:templateId")
   def latex(gdocId: String, templateId: String): Resp = handleErrors(() => {
     val id = GDocId.from(gdocId, templateId)
-    val (title, latex) = GDoc2LatexWorker.getLatex(id)
-    val t = "Latex for \"" + title + "\""
+    val input = GDoc2LatexWorker.getLatex(id)
+    val t = "Latex for \"" + input.title + "\""
     htmlResp(t,
       h1(t),
-      pre(latex)
+      pre(input.mainFileString)
     )
   })
 
@@ -195,6 +211,7 @@ case class Routes() extends cask.MainRoutes {
         body(bodycontent: _*)
       )
     ))
+
   @cask.get("/update/:gdocId")
   def update(gdocId: String): Resp = update(gdocId, "")
 
@@ -204,6 +221,20 @@ case class Routes() extends cask.MainRoutes {
     val pdf = GDoc2LatexWorker.updatePDF(id)
     respondWithPDF(id, pdf)
   })
+
+  @cask.get("/clean/:gdocId")
+  def clean(gdocId: String): Resp = clean(gdocId, "")
+
+  @cask.get("/clean/:gdocId/:templateId")
+  def clean(gdocId: String, templateId: String): Resp = handleErrors(() => {
+    val id = GDocId.from(gdocId, templateId)
+    GDoc2LatexWorker.clean(id)
+    htmlResp("Cleaned",
+      h1(s"Cleaned all files for $gdocId"),
+      p(a("build again", href := "/update/" + id.toParam))
+    )
+  })
+
 
   def respondWithPDF(gdocId: GDocId, pdf: Option[File]): Resp = {
     if (pdf.isDefined)
@@ -224,7 +255,7 @@ case class Routes() extends cask.MainRoutes {
   }
 
   @cask.get("/pdf/:gdocId")
-  def pdf(gdocId: String): Resp = pdf(gdocId,"")
+  def pdf(gdocId: String): Resp = pdf(gdocId, "")
 
   @cask.get("/pdf/:gdocId/:templateId")
   def pdf(gdocId: String, templateId: String): Resp = {

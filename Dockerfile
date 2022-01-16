@@ -13,14 +13,17 @@ RUN apt-get install -y latexmk
 
 RUN java --version
 
-# Add our code
-ADD ./target/universal/stage /opt/webapp/
-WORKDIR /opt/webapp
+# securing latex
 ADD ./config/texmf.cnf /etc/texmf/texmf.d/my.cnf
 RUN update-texmf
 
+# Add our code
+ADD ./target/universal/stage /opt/webapp/
+ADD ./credentials /opt/webapp/credentials/
+WORKDIR /opt/webapp
+
 # Expose is NOT supported by Heroku
-EXPOSE 5000 		
+EXPOSE 3000 		
 
 # Run the image as a non-root user
 

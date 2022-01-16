@@ -1,48 +1,61 @@
 package edu.cmu.ckaestne.gdoc2latex
 
-import com.google.api.services.docs.v1.model.{Document, StructuralElement}
-import com.google.api.services.docs.v1.model.ParagraphElement
-import com.google.api.services.docs.v1.model.TextRun
+import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
 
+import java.io.File
+import java.nio.charset.StandardCharsets
 import scala.io.Source
-import scala.jdk.CollectionConverters._
 
-object Template {
-  lazy val defaultTemplate =
-    new Template(Source.fromInputStream(this.getClass.getResourceAsStream("/default_template.tex")).getLines().mkString("\n"))
+/**
+ * A context represents possibly other files needed to build the project, including the template into which the latex text is generated.
+ *
+ * A context always contains a template and may contain other files in a directory (no subdirectories).
+ *
+ * If no context id is provided, a default template will be loaded and no other files are in the context.
+ *
+ * If an id to a google docs file is provided, the plain text of that file is used as the template and no other files are in the context
+ *
+ * If an id to a google drive folder is provided, the files in that folder other than main.tex are included in the context. If a main.tex file is included that is used as the template, otherwise a default template is used.
+ *
+ * After rendering the context is turned into a LatexInput which contains the same files, but with an extra "main.tex" file that contains the rendered document (using the template)
+ */
+object Context {
 
-  def loadGdoc(gdocId: String): Template = {
-    val doc = GDocConnection.getDocument(gdocId)
-    new Template(getPlainText(doc))
+  lazy val defaultTemplate: String =
+    Source.fromInputStream(this.getClass.getResourceAsStream("/default_template.tex")).getLines().mkString("\n")
+
+  def fromGoogleId(id: String): Context = {
+    val dir = GDocConnection.getFileOrDirectory(id)
+    val files = dir.filter(_.name != "main.tex").map(f => (f.name, f.content)).toMap
+    val template = dir.find(_.name == "main.tex").map(f => new String(f.content, StandardCharsets.UTF_8)).getOrElse(defaultTemplate)
+
+    Context(template, files)
   }
 
-  private def getPlainText(doc: Document): String = {
-    val elements = doc.getBody.getContent
-    val sb: StringBuilder = new StringBuilder
-    for (element <- elements.asScala) {
-      if (element.getParagraph() != null) {
-        for (paragraphElement <- element.getParagraph.getElements.asScala) {
-          sb.append(readParagraphElement(paragraphElement))
-        }
-      }
-    }
-    sb.toString
+  def fromFile(file: File): Context = {
+    val template = Source.fromFile(file).getLines().mkString("\n")
+    Context(template, Map())
   }
 
+  def defaultContext: Context = Context(defaultTemplate, Map())
 
-  private def readParagraphElement(element: ParagraphElement): String = {
-    val run = element.getTextRun
-    if (run == null || run.getContent == null) { // The TextRun can be null if there is an inline object.
-      return ""
-    }
-    run.getContent
+}
+
+case class Context(template: String, files: Map[String, Array[Byte]]) {
+  def render(doc: LatexDoc): LatexInput = {
+    val mainTex = template.replace("\\TITLE", doc.title)
+      .replace("\\ABSTRACT", doc.abstr)
+      .replace("\\CONTENT", doc.latexBody)
+    val mainFile = ("main.tex" -> mainTex.getBytes(StandardCharsets.UTF_8))
+    LatexInput(doc.title, files + mainFile)
   }
 }
 
-class Template(templateContent: String) {
-  def render(doc: LatexDoc): String = {
-    return templateContent.replace("\\TITLE", doc.title)
-      .replace("\\ABSTRACT", doc.abstr)
-      .replace("\\CONTENT", doc.latexBody)
-  }
+case class LatexInput(title: String, files: Map[String, Array[Byte]]) {
+
+  val mainFile = "main.tex"
+
+  def mainFileContent: Array[Byte] = files(mainFile)
+
+  def mainFileString: String = new String(files(mainFile), StandardCharsets.UTF_8)
 }
