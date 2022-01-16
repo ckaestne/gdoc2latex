@@ -1,0 +1,3 @@
+% for security do not allow access outside of working directory
+
+openin_any = p
