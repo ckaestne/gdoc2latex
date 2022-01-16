@@ -3,8 +3,8 @@ package edu.cmu.ckaestne.gdoc2latex.server
 import cask.Response
 import cask.model.StaticFile
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
+import edu.cmu.ckaestne.gdoc2latex.converter.{Context, GDoc2LatexConverter, LatexInput}
 import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
-import edu.cmu.ckaestne.gdoc2latex.{Context, GDoc2LatexConverter, LatexInput}
 import scalatags.Text.all._
 
 import java.io.{BufferedReader, File, InputStreamReader}

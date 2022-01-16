@@ -1,4 +1,4 @@
-package edu.cmu.ckaestne.gdoc2latex
+package edu.cmu.ckaestne.gdoc2latex.converter
 
 import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
 

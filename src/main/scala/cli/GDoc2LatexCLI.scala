@@ -1,7 +1,7 @@
 package edu.cmu.ckaestne.gdoc2latex.cli
 
+import edu.cmu.ckaestne.gdoc2latex.converter.{Context, GDoc2LatexConverter}
 import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
-import edu.cmu.ckaestne.gdoc2latex.{Context, GDoc2LatexConverter}
 import scopt.OParser
 
 import java.io.File
