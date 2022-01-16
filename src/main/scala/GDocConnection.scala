@@ -13,7 +13,7 @@ import com.google.auth.Credentials
 import com.google.auth.http.HttpCredentialsAdapter
 import com.google.auth.oauth2.{GoogleCredentials, ServiceAccountCredentials}
 
-import java.io.{File, IOException, InputStreamReader}
+import java.io.{File, FileInputStream, IOException, InputStreamReader}
 import java.security.GeneralSecurityException
 import java.util
 import java.util.Collections
@@ -28,11 +28,11 @@ object GDocConnection {
   private val SCOPES = Collections.singletonList(DocsScopes.DOCUMENTS_READONLY)
 
   //secret, do not share this file
-  private val CREDENTIALS_FILE_PATH = "/gdoc2latex-d56ea8eb76c8.json"
+  private val CREDENTIALS_FILE_PATH = "credentials/gdoc2latex-d56ea8eb76c8.json"
 
   @throws[IOException]
   private def getCredentials(): Credentials = { // Load client secrets.
-    val in = this.getClass.getResourceAsStream(CREDENTIALS_FILE_PATH)
+    val in = new FileInputStream(CREDENTIALS_FILE_PATH)
     ServiceAccountCredentials.fromStream(in).createScoped(SCOPES)
   }
 

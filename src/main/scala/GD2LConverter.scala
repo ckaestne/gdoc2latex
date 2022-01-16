@@ -28,7 +28,8 @@ class GDoc2LatexConverter {
   }
 
   private def getParagraphElementText(e: ParagraphElement): Option[String] = {
-    if (e.getTextRun == null) System.err.println(e)
+    if (e.getTextRun == null)
+      System.err.println(e)
     if (e.getTextRun == null || e.getTextRun.getContent == null) None
     else {
       var text = processPlainText(e.getTextRun.getContent)
@@ -48,12 +49,16 @@ class GDoc2LatexConverter {
         } else if (link != null && (link contains "paperpile.com/c/")) {
           val refs = link.drop(link.lastIndexOf("/") + 1).split("\\+")
           text = "\\cite{" + refs.mkString(",") + "}"
-        } else if (link != null && !(link contains "paperpile.com/b/"))
-          System.err.println(s"unsupported direct link ${style.getLink.getUrl} for $text")
+        } else if (link != null && !(link contains "paperpile.com/b/")) {
+          if (link == text)
+            text = s"\\url{$link}"
+          else text = s"\\href{$link}{$text}"
+//          System.err.println(s"unsupported direct link ${style.getLink.getUrl} for $text")
       }
+        }
 
 
-      Some(text)
+        Some(text)
     }
   }
 
@@ -110,6 +115,7 @@ class GDoc2LatexConverter {
     val body = doc.getBody
 
     val paragraphs = body.getContent.asScala.flatMap(se => Option(se.getParagraph)).toList
+    builder.title=doc.getTitle
 
     for (p: Paragraph <- paragraphs) {
       //      println(c)
@@ -126,7 +132,7 @@ class GDoc2LatexConverter {
       else if ("NORMAL_TEXT" == style)
         processParagraph(builder, p)
       else
-        System.err.println("unknonw style: " + style)
+        System.err.println("unknown style: " + style)
 
       val headingId = p.getParagraphStyle.getHeadingId
       if (headingId != null)
