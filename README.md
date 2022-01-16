@@ -14,6 +14,7 @@ This project reads the formatting from Google Docs and converts it to Latex code
 * *Citations* are supported through [Paperpile](https://paperpile.com/). The bibliography is rendered by Paperpile and Paperpile links are translated to `\cite` instructions. No use of Bibtex.
 * *Strikethrough* formatting is considered as comments and omitted in Latex
 * *Headings* in GDoc are converted to `\section`, `\subsection`, and `\subsubsection` in Latex
+* Internal links to section headers are converted to `\ref` references (the link text is discarded).
 * A heading formatted as *Title* replaces the `\TITLE` command in the Latex template
 * A paragraph starting with “Abstract:” is used as the abstract in the Latex template
 * Text is otherwise not transformed or escaped, so Latex commands for math or images can be inserted directly in the Google Doc document.
@@ -23,11 +24,11 @@ Additional formatting conversion could be added as needed.
 
 ## Try it
 
-Until I exceed the free limits of Heroku, here is a version deployed online to try: 
+Until I exceed the free limits of Heroku, here is a version deployed online to try: https://gdoc2latex.herokuapp.com/update/1yUWsgyIDd7_C7s2SghSAaaPxmKNE0_hlcqfgbUjVci8
 
-This link uses this document, but simply replace the document ID with a different one to try other documents.
+This link uses [this document](https://docs.google.com/document/d/1yUWsgyIDd7_C7s2SghSAaaPxmKNE0_hlcqfgbUjVci8/edit#), but simply replace the document ID with a different one to try other documents.
 
-Here is more complete example from a recent paper draft (document and template folder): 
+Here is more complete example from a recent paper draft ([document](https://docs.google.com/document/d/1yZZqEWgR7C7DcrkJZeuSpXRDqCyndUP4o8pvXF-1jvc/edit) and [template folder](https://drive.google.com/drive/folders/1qY_DmTZhPDb0SnaL5S3dH-hvSKk8VV5A)): https://gdoc2latex.herokuapp.com/update/1yZZqEWgR7C7DcrkJZeuSpXRDqCyndUP4o8pvXF-1jvc/1qY_DmTZhPDb0SnaL5S3dH-hvSKk8VV5A
 
 
 
@@ -69,9 +70,9 @@ The project contains a `Server` class for this purpose that responds to GET requ
 
 In all these commands, templateid is optional. It can either point to a Google Docs document of which the plain text is used as a template or to a Google Drive folder. The folder can contain a main.tex file as the template and possibly other files such as images. Subfolders are not supported.
 
-**Installation and credentials:** The process to compile the project and provide a `credentials/api.json` file are the same as above. The server can be started with the `gdoc2latex-server` binary in `/target/universal/stage/bin` and will listen on `http://localhost:3000` by default.
+**Installation and credentials:** The process to compile the project and provide a `credentials/api.json` file are the same as above. The server can be started with the `server` binary in `/target/universal/stage/bin` and will listen on `http://localhost:3000` by default.
 
-The server expects that *latex* and *latexmk* are installed locally. The server will store results in the `out` directory. It uses a temporary directory of the operating system to compile the generated latex. By default it calls `latexmk --pdf --interaction=nonstopmode main.tex` with a 60 second timeout.
+The server expects that *latex* is installed locally. The server will store results in the `out` directory. It uses a temporary directory of the operating system to compile the generated latex. By default it calls `pdflatex --pdf --interaction=nonstopmode main.tex` twice with a 10 second timeout each.
 
-**Docker and Heroku:** Optionally, the system can be easily deployed to Docker and Heroku. Due to needed credentials, no prebuild containers are provided, but the `Dockerfile` and the `build-and-deploy.sh` script should make this process hopefully fairly straightforward.
+**Docker and Heroku:** Optionally, the system can be easily deployed to Docker and Heroku. Due to needed credentials, no prebuild containers are provided, but the `Dockerfile` and the `build-and-deploy.sh` script should make this process hopefully fairly straightforward. The default Dockerfile installs all of tex-live which is huge and may not be needed.
 

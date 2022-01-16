@@ -99,19 +99,22 @@ object GDoc2LatexWorker {
    * @return
    */
   private def updatePDFInternal(gdocId: GDocId, input: LatexInput): Option[File /*PDF*/ ] = {
+    println(s"rendering latex for $gdocId, ${input.files.size} files")
     val workingDirectory = Files.createTempDirectory("gdoc2latex")
     for ((name, content) <- input.files) {
       val file = workingDirectory.resolve(name)
       Files.write(file, content)
     }
-    val cmd = Seq("timeout", "60s", "latexmk", "--pdf", "--interaction=nonstopmode", "main.tex")
-    val process = new ProcessBuilder(cmd: _*)
-      .directory(workingDirectory.toFile).start()
-    val out = process.getInputStream
-    val err = process.getErrorStream
-    val success = process.waitFor() == 0
-    val log = new BufferedReader(new InputStreamReader(out)).lines().collect(Collectors.joining("\n"))
-    val errorLog = new BufferedReader(new InputStreamReader(err)).lines().collect(Collectors.joining("\n"))
+    val startTime = System.currentTimeMillis()
+    val cmd1 = Seq("timeout", "10s", "pdflatex", "-draftmode", "--interaction=nonstopmode", "main.tex")
+    val cmd2 = Seq("timeout", "10s", "pdflatex", "--interaction=nonstopmode", "main.tex")
+    val (exitCode1, out1, err1) = run(cmd1, workingDirectory)
+    val midTime = System.currentTimeMillis()
+    println(s"pdflatex -draftmode done. ${midTime - startTime} ms, exit code $exitCode1")
+    val (exitCode2, out2, err2) = run(cmd2, workingDirectory)
+    val endTime = System.currentTimeMillis()
+    println(s"pdflatex done. ${endTime - midTime} ms, exit code $exitCode2")
+    val success = (exitCode1 == 0) && (exitCode2 == 0)
 
     gdocId.docId.synchronized {
       if (success)
@@ -119,8 +122,10 @@ object GDoc2LatexWorker {
       else
         Files.deleteIfExists(pdfPath(gdocId))
       Files.write(texPath(gdocId), input.mainFileContent)
-      Files.writeString(logPath(gdocId), "> " + cmd.mkString(" ") + "\n\n" + log)
-      Files.writeString(errPath(gdocId), errorLog)
+      Files.writeString(logPath(gdocId),
+        "> " + cmd1.mkString(" ") + "\n\n" + out1 + "\n\n" +
+          "> " + cmd2.mkString(" ") + "\n\n" + out2)
+      Files.writeString(errPath(gdocId), err1 + "\n\n" + err2)
     }
 
     for (file <- workingDirectory.toFile.listFiles())
@@ -128,6 +133,19 @@ object GDoc2LatexWorker {
     Files.delete(workingDirectory)
     if (success) Some(pdfPath(gdocId).toFile) else None
   }
+
+  private def run(cmd: Seq[String], workingDirectory: Path): (Int /*ExitCode*/ , String /*StdOut*/ , String /*StdErr*/ ) = {
+    val process = new ProcessBuilder(cmd: _*)
+      .directory(workingDirectory.toFile).start()
+    val out = process.getInputStream
+    val err = process.getErrorStream
+    val exitCode = process.waitFor()
+
+    val log = new BufferedReader(new InputStreamReader(out)).lines().collect(Collectors.joining("\n"))
+    val errorLog = new BufferedReader(new InputStreamReader(err)).lines().collect(Collectors.joining("\n"))
+    (exitCode, log, errorLog)
+  }
+
 
   def clean(gdocId: GDocId) = {
     for (file <- List(
@@ -159,12 +177,17 @@ case class Routes() extends cask.MainRoutes {
       p("This project will convert a Google Docs document into Latex. " +
         "All documents are identified by an ID of 44 characters that can be found in the URL of the document. " +
         "This project can only access public documents or those that are shared with ", tt(SERVICE_ACCOUNT_EMAIL), "."),
-      p("Optionally a second Google Docs document can be provided that provides the Latex main file in which ", tt("\\CONTENT"), " will be replaced by the body of the document, ", tt("\\TITLE"), " with the title, and ", tt("\\ABSTRACT"), " with the abstract."),
+      p("Optionally a second ID pointing either to a Google Docs document or a Google Drive folder can be provided that provides the Latex template and possible images to include."),
       p("The following end points are supported: ",
         ul(
-          li(tt("/latex/$DOCID/$TEMPLATEID"), ": Shows the converted Latex document. If the document id for the template is not provided a default template will be used.")
+          li(tt("/update/$DOCID"), ": Converts and compiles the document, returning the PDF."),
+          li(tt("/update/$DOCID/$TEMPLATEID"), ": Converts and compiles the document using the provided template file or directory, returning the PDF."),
+          li(tt("/latex/$DOCID/$TEMPLATEID"), ": Shows the converted Latex document."),
+            li(tt("/log/$DOCID/$TEMPLATEID"), ": Shows the logs of the last pdflatex run of this document."),
+          li(tt("/pdf/$DOCID/$TEMPLATEID"), ": Returns the most recent PDF for this document, without updating it.")
         )
-      )
+      ),
+      p("See the ", a("GitHub page", href := "https://github.com/ckaestne/gdoc2latex"), " of this project for more details.")
     )
 
   def handleErrors(f: () => Resp): Resp = {

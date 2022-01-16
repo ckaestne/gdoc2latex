@@ -17,7 +17,7 @@ import scala.jdk.CollectionConverters._
 object GDocConnection {
   private val APPLICATION_NAME = "GDoc2Latex"
   private val JSON_FACTORY = GsonFactory.getDefaultInstance
-  
+
   private val SCOPES = List(DocsScopes.DOCUMENTS_READONLY, DriveScopes.DRIVE_READONLY)
 
   //secret, do not share this file
@@ -47,7 +47,9 @@ object GDocConnection {
   }
 
   def getDirectory(directoryId: String): List[GDriveFile] = {
+    println(s"loading directory $directoryId")
     val fileList = driveService.files().list().setQ(s"'$directoryId' in parents").setFields("files(id, name, mimeType, version)").execute()
+    println(s"loading ${fileList.getFiles.size()} files")
     for (file <- fileList.getFiles.asScala.toList) yield {
       val load = if (file.getMimeType=="application/vnd.google-apps.document") loadGDocPlain _ else loadBinaryFile _
 
@@ -88,9 +90,11 @@ object GDriveContentCache {
   def getFile(id: String, name: String, version: Long, load: (String) => Array[Byte]): GDriveFile = {
     val cachedFile = this.cache.get(id)
     if (cachedFile.isDefined && cachedFile.get.version == version) {
+      println(s"loading file $id from cache")
       enqueue(id)
       cachedFile.get
     } else {
+      println(s"downloading file $id")
       val content = load(id)
       val newFile = GDriveFile(id, name, version, content)
       cache.put(id, newFile)

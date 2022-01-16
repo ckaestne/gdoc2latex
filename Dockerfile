@@ -9,8 +9,6 @@ RUN pdflatex --version
 
 RUN apt-get install -y openjdk-17-jre-headless
 
-RUN apt-get install -y latexmk
-
 RUN java --version
 
 # securing latex
@@ -29,5 +27,5 @@ EXPOSE 3000
 
 # Run the app.  CMD is required to run on Heroku
 # $PORT is set by Heroku			
-CMD bin/gdoc2latex $PORT
+CMD bin/server $PORT
 
