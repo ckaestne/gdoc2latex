@@ -1,6 +1,6 @@
 package edu.cmu.ckaestne.gdoc2latex.cli
 
-import edu.cmu.ckaestne.gdoc2latex.converter.{Context, GDoc2LatexConverter}
+import edu.cmu.ckaestne.gdoc2latex.converter.{Context, GDocParser, LatexRenderer}
 import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
 import scopt.OParser
 
@@ -44,9 +44,9 @@ object GDoc2LatexCLI extends App {
       val doc = GDocConnection.getDocument(config.documentid)
 
       val context = config.template.map(Context.fromFile).getOrElse(Context.defaultContext)
-      val ldoc = new GDoc2LatexConverter().convert(doc)
+      val ldoc = new GDocParser().convert(doc)
 
-      val latex = context.render(ldoc)
+      val latex = context.render(LatexRenderer.render(ldoc))
 
       if (config.out.isDefined)
         Files.write(config.out.get.toPath, latex.mainFileContent)

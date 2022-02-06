@@ -18,3 +18,5 @@ libraryDependencies += "com.lihaoyi" %% "cask" % "0.7.3"
 libraryDependencies += "com.lihaoyi" %% "scalatags" % "0.9.1"
 libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.1"
 
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % "test"
+

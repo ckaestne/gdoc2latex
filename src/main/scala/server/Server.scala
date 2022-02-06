@@ -3,7 +3,7 @@ package edu.cmu.ckaestne.gdoc2latex.server
 import cask.Response
 import cask.model.StaticFile
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
-import edu.cmu.ckaestne.gdoc2latex.converter.{Context, GDoc2LatexConverter, LatexInput}
+import edu.cmu.ckaestne.gdoc2latex.converter.{Context, GDocParser, LatexInput, LatexRenderer}
 import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
 import scalatags.Text.all._
 
@@ -47,8 +47,8 @@ object GDoc2LatexWorker {
       Files.writeString(rawPath(gdocId), doc.toString)
     }
 
-    val ldoc = new GDoc2LatexConverter().convert(doc)
-    context.render(ldoc)
+    val ldoc = new GDocParser().convert(doc)
+    context.render(LatexRenderer.render(ldoc))
   }
 
   /**
