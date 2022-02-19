@@ -201,6 +201,34 @@ class GDocParser {
    * * merges image with subsequent paragraph as caption if in italics
    */
   private def postprocessingDocumentElements(l: List[IDocumentElement]): List[IDocumentElement] = l match {
+    // detect code fragments
+    case (p@IParagraph(_)) :: tail if p.plainText.trim startsWith "```" =>
+      var t = tail
+      val text = p.plainText.replace('\u000B','\n')
+      val lang = text.trim.drop(3).takeWhile(_!='\n').trim // text after ```
+      var code = text.dropWhile(_!='\n').drop(1).replaceAll("```\\s*$", "") // skip first line and remove closing ``` if there
+      var end = text.trim.length>3 && text.trim.endsWith("```")
+      var caption: Option[IParagraph] = None
+      while (t.nonEmpty && t.head.isInstanceOf[IParagraph] && !end) {
+        val p = t.head.asInstanceOf[IParagraph]
+        val text = p.plainText.replace('\u000B','\n')
+        end = text.trim.endsWith("```")
+        code = (if (code.nonEmpty) code +"\n" else "") +text.replaceAll("```\\s*$", "")
+        t = t.tail
+      }
+      if (end && t.nonEmpty && t.head.isInstanceOf[IParagraph]) {
+        val p = t.head.asInstanceOf[IParagraph]
+        if (p.content.size==1 && p.content.head.isInstanceOf[IItalics]) {
+          caption= Some(IParagraph(p.content.head.asInstanceOf[IItalics].elements))
+          t=t.tail
+        }
+      }
+      if (!end) {
+        //not a valid code sequence
+        p:: postprocessingDocumentElements(tail)
+      } else {
+        ICode(if (lang!="") Some(lang) else None, code, caption)::postprocessingDocumentElements(t)
+      }
     // image followed by italics paragraph is image with caption
     case IImage(id, uri, None, width) :: IParagraph(inner) :: tail if inner.size == 1 && inner.head.isInstanceOf[IItalics] =>
       IImage(id, uri, Some(IParagraph(inner.head.asInstanceOf[IItalics].elements)), width) :: postprocessingDocumentElements(tail)

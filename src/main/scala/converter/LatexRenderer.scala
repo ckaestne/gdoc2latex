@@ -47,7 +47,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     case IItalics(i) => s"\\emph{${renderText(i)}}"
     case u@IUnderlined(i) =>
       println("Section:" + u.getPlainText())
-      s"\\hyperref[${Util.textToId(u.getPlainText())}]{${renderText(i)}"
+      s"\\hyperref[${Util.textToId(u.getPlainText())}]{${renderText(i)}}"
     case IReference(i) => s"\\href{$i}}"
     case ICitation(refs) => "\\cite{" + refs.mkString(",") + "}"
     case IURL(link, None) => s"\\url{$link}"
@@ -83,6 +83,11 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
       } else
         defaultImg
     }
+
+    case ICode(lang, code, caption) =>
+      val config = (lang.map("language="+_) :: caption.map(p=> "title={"+renderText(p.content)+"}") :: Nil).flatten
+      val configTxt = if (config.isEmpty) "" else config.mkString("[",",","]")
+      s"\\begin{lstlisting}$configTxt\n$code\\end{lstlisting}"
   }
 
   private def resolveImageUri(id: String, uri: String): Option[(Path, InputStream)] = {

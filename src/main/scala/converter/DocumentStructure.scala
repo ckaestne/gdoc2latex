@@ -76,5 +76,7 @@ case class IHeading(level: Int, id: Option[String], text: IParagraph) extends ID
 
 case class IImage(id: String, contentUri: String, caption: Option[IParagraph], widthPt: Int) extends IDocumentElement
 
+case class ICode(language: Option[String], code: String, caption: Option[IParagraph]) extends IDocumentElement
+
 case class IDocument(title: IParagraph, abstr: Option[List[IParagraph]], content: List[IDocumentElement])
 

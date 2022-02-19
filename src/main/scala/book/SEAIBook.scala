@@ -135,7 +135,7 @@ object SEAIBook extends App {
   }
 
 
-//  val drawings = drawings_directories.flatMap(GDocConnection.collectDrawings)
+  val drawings = drawings_directories.flatMap(GDocConnection.collectDrawings)
 
-  bookToLatex(book/*, drawings*/)
+  bookToLatex(book, drawings)
 }

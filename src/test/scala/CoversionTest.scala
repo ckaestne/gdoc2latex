@@ -143,4 +143,11 @@ class CoversionTest extends AnyFlatSpec with should.Matchers {
   }
   //
 
+  "Code" should "be detected correctly" in {
+    val codeFragments = parsed1.content.filter(_.isInstanceOf[ICode])
+    assert(codeFragments(0) == ICode(Some("java"),"this\nis code\n",None))
+    assert(codeFragments(1) == ICode(Some("js"),"code in one paragraph\n  b",Some(IParagraph(List(IPlainText("Code caption"))))))
+    assert(codeFragments(2) == ICode(None,"  more\n  code",None))
+
+  }
 }
