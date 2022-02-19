@@ -19,4 +19,5 @@ libraryDependencies += "com.lihaoyi" %% "scalatags" % "0.9.1"
 libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.1"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % "test"
+libraryDependencies += "commons-io" % "commons-io" % "2.11.0"
 

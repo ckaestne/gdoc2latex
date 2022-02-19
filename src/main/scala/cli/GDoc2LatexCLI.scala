@@ -46,7 +46,7 @@ object GDoc2LatexCLI extends App {
       val context = config.template.map(Context.fromFile).getOrElse(Context.defaultContext)
       val ldoc = new GDocParser().convert(doc)
 
-      val latex = context.render(LatexRenderer.render(ldoc))
+      val latex = context.render(new LatexRenderer().render(ldoc))
 
       if (config.out.isDefined)
         Files.write(config.out.get.toPath, latex.mainFileContent)

@@ -21,27 +21,25 @@ case class IPlainText(text: String) extends IFormattedText {
   def getPlainText() = text
 }
 
+trait ISimpleFormattedSequence extends IFormattedText {
+  def elements: List[IFormattedText]
+  private val plain = elements.map(_.getPlainText()).mkString
+  if (plain.nonEmpty && plain.head == ' ')
+    System.err.println(s"Sequence starts with whitespace: \"$plain\"")
+  if (plain.nonEmpty && plain.last == ' ')
+    System.err.println(s"Sequence ends with whitespace: \"$plain\"")
+
+  def getPlainText() = plain
+}
+
 /**
  * bold/italic sequences should always start with a letter, not whitespace or punctuation
  */
-case class IBold(elements: List[IFormattedText]) extends IFormattedText {
-  private val plain = elements.map(_.getPlainText()).mkString
-  if (plain.nonEmpty && ! "\\w".r.matches(plain.take(1)))
-    System.err.println(s"Bold sequence starts with nonword character: \"$plain\"")
-  if (plain.nonEmpty && plain.last == ' ')
-    System.err.println(s"Bold sequence ends with whitespace: \"$plain\"")
+case class IBold(elements: List[IFormattedText]) extends ISimpleFormattedSequence
 
-  def getPlainText() = plain
-}
+case class IItalics(elements: List[IFormattedText]) extends ISimpleFormattedSequence
 
-case class IItalics(elements: List[IFormattedText]) extends IFormattedText {
-  private val plain = elements.map(_.getPlainText()).mkString
-  if (plain.nonEmpty && ! "\\w".r.matches(plain.take(1)))
-    System.err.println(s"Italics sequence starts with nonword character: \"$plain\"")
-  if (plain.nonEmpty && plain.last == ' ')
-    System.err.println(s"Italics sequence ends with whitespace: \"$plain\"")
-  def getPlainText() = plain
-}
+case class IUnderlined(elements: List[IFormattedText]) extends ISimpleFormattedSequence
 
 case class IReference(anchor: String) extends IFormattedText {
   def getPlainText() = "$REF"
@@ -76,4 +74,7 @@ case class IBibliography(items: List[(String /*key*/ , IParagraph)]) extends IDo
 
 case class IHeading(level: Int, id: Option[String], text: IParagraph) extends IDocumentElement
 
+case class IImage(id: String, contentUri: String, caption: Option[IParagraph], widthPt: Int) extends IDocumentElement
+
 case class IDocument(title: IParagraph, abstr: Option[List[IParagraph]], content: List[IDocumentElement])
+

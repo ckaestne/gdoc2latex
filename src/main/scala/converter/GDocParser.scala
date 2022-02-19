@@ -8,9 +8,15 @@ import scala.jdk.CollectionConverters._
 class GDocParser {
 
 
-  private def convertParagraph(p: Paragraph): Option[IParagraph] =
+  private def convertParagraph(doc: Document, p: Paragraph): Option[IDocumentElement] =
     if (p.getElements == null) None
-    else Some(IParagraph(simplifyIFormattedText(convertParagraphText(p.getElements.asScala.toList))))
+    else extractImage(doc, p).orElse(
+      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList)))))
+
+  private def convertTextParagraph(doc: Document, p: Paragraph): Option[IParagraph] =
+    if (p.getElements == null) None
+    else
+      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList))))
 
 
   private sealed trait SequenceFormatting {
@@ -88,6 +94,12 @@ class GDocParser {
 
     def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = applyAfterTrim(IBold.apply)
   }
+  private object UnderlinedFormatting extends SequenceFormatting {
+    override def hasFormatting(e: ParagraphElement): Boolean =
+      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getUnderline && e.getTextRun.getTextStyle.getLink==null else false
+
+    def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = applyAfterTrim(IUnderlined.apply)
+  }
 
   private object ItalicsFormatting extends SequenceFormatting {
     override def hasFormatting(e: ParagraphElement): Boolean =
@@ -124,7 +136,7 @@ class GDocParser {
     }
   }
 
-  private val sequenceFormattings = List(BoldFormatting, ItalicsFormatting, LinkFormatting)
+  private val sequenceFormattings = List(BoldFormatting, ItalicsFormatting, LinkFormatting, UnderlinedFormatting)
 
   private def isComment(e: ParagraphElement): Boolean =
     if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getStrikethrough else false
@@ -159,25 +171,70 @@ class GDocParser {
       }
     }
 
+  private def extractImage(doc: Document, p: Paragraph): Option[IImage] = {
+    val inlineObjects = p.getElements.asScala.filter(_.getInlineObjectElement != null)
+    if (inlineObjects.isEmpty) return None
+    if (inlineObjects.size > 1) {
+      System.err.println(s"Multiple inline objects per paragraph not supported ${p}")
+      return None
+    }
+    val text = p.getElements.asScala.map(e => {
+      val t = e.getTextRun; if (t == null) "" else t.getContent
+    }).mkString
+    if (text.trim.nonEmpty) {
+      System.err.println(s"Text in the same paragraph as inline object not supported \"$text\"")
+      return None
+    }
+    val objectId = inlineObjects.head.getInlineObjectElement.getInlineObjectId
+    val obj = doc.getInlineObjects.get(objectId)
+    if (obj == null || obj.getInlineObjectProperties == null || obj.getInlineObjectProperties.getEmbeddedObject == null || obj.getInlineObjectProperties.getEmbeddedObject.getImageProperties == null) {
+      System.err.println(s"Inline object $objectId not found or not an image: $obj")
+      return None
+    }
+    val uri = obj.getInlineObjectProperties.getEmbeddedObject.getImageProperties.getContentUri
+    val width = obj.getInlineObjectProperties.getEmbeddedObject.getSize.getWidth.getMagnitude.toInt
+    Some(IImage(objectId, uri, None, width))
+  }
 
-  private[converter] def simplifyIFormattedText(l: List[IFormattedText]): List[IFormattedText] = (l match {
-    case IPlainText(c) :: tail if c.isEmpty => simplifyIFormattedText(tail)
+  /**
+   * postprocessing steps:
+   * * merges image with subsequent paragraph as caption if in italics
+   */
+  private def postprocessingDocumentElements(l: List[IDocumentElement]): List[IDocumentElement] = l match {
+    // image followed by italics paragraph is image with caption
+    case IImage(id, uri, None, width) :: IParagraph(inner) :: tail if inner.size == 1 && inner.head.isInstanceOf[IItalics] =>
+      IImage(id, uri, Some(IParagraph(inner.head.asInstanceOf[IItalics].elements)), width) :: postprocessingDocumentElements(tail)
+    case head :: tail => head :: postprocessingDocumentElements(tail)
+    case Nil => Nil
+  }
+
+  /**
+   * deletes empty fragments and merges subsequent plain text fragments
+   */
+  private[converter] def postprocessingTextFragments(l: List[IFormattedText]): List[IFormattedText] = (l match {
+    case IPlainText(c) :: Nil if c.trim.isEmpty => Nil
+    case IPlainText(c) :: tail if c.isEmpty => postprocessingTextFragments(tail)
+    case IUnderlined(i) :: tail =>
+      val newI = postprocessingTextFragments(i)
+      val newTail = postprocessingTextFragments(tail)
+      if (newI.isEmpty)
+        newTail else IUnderlined(newI) :: newTail
     case IBold(i) :: tail =>
-      val newI = simplifyIFormattedText(i)
-      val newTail = simplifyIFormattedText(tail)
+      val newI = postprocessingTextFragments(i)
+      val newTail = postprocessingTextFragments(tail)
       if (newI.isEmpty)
         newTail else IBold(newI) :: newTail
     case IItalics(i) :: tail =>
-      val newI = simplifyIFormattedText(i)
-      val newTail = simplifyIFormattedText(tail)
+      val newI = postprocessingTextFragments(i)
+      val newTail = postprocessingTextFragments(tail)
       if (newI.isEmpty)
         newTail else IItalics(newI) :: newTail
-    case (i: IPlainText) :: tail => i :: simplifyIFormattedText(tail)
-    case (i: IReference) :: tail => i :: simplifyIFormattedText(tail)
-    case (i: ICitation) :: tail => i :: simplifyIFormattedText(tail)
+    case (i: IPlainText) :: tail => i :: postprocessingTextFragments(tail)
+    case (i: IReference) :: tail => i :: postprocessingTextFragments(tail)
+    case (i: ICitation) :: tail => i :: postprocessingTextFragments(tail)
     case IURL(link, inner) :: tail =>
-      val newI = inner.map(simplifyIFormattedText)
-      val newTail = simplifyIFormattedText(tail)
+      val newI = inner.map(postprocessingTextFragments)
+      val newTail = postprocessingTextFragments(tail)
       if (newI.isDefined && newI.get.isEmpty)
         newTail else IURL(link, newI) :: newTail
     case Nil => Nil
@@ -226,39 +283,44 @@ class GDocParser {
         }
     }
 
-    for (paragraph <- mainParagraphs.reverse; p <- convertParagraph(paragraph); if p.trimNonEmpty) {
-      val namedStyle = paragraph.getParagraphStyle.getNamedStyleType
-      val headingId = Option(paragraph.getParagraphStyle.getHeadingId)
-      if ("TITLE" == namedStyle)
-        title = p
-      else if ("HEADING_1" == namedStyle) {
-        mainContent ::= IHeading(1, headingId, p)
-      } else if ("HEADING_2" == namedStyle)
-        mainContent ::= IHeading(2, headingId, p)
-      else if ("HEADING_3" == namedStyle)
-        mainContent ::= IHeading(3, headingId, p)
-      else if ("NORMAL_TEXT" == namedStyle) {
-        if (p.plainText.startsWith("Abstract: "))
-          abstr = Some(List(p))
-        else
-          addParagraph(p, paragraph.getBullet != null)
-      } else
-        System.err.println("unknown style: " + namedStyle)
-    }
+    for (paragraph <- mainParagraphs.reverse; pe <- convertParagraph(doc, paragraph))
+      pe match {
+        case p: IParagraph if p.trimNonEmpty =>
+          val namedStyle = paragraph.getParagraphStyle.getNamedStyleType
+          val headingId = Option(paragraph.getParagraphStyle.getHeadingId)
+          if ("TITLE" == namedStyle)
+            title = p
+          else if ("HEADING_1" == namedStyle) {
+            mainContent ::= IHeading(1, headingId, p)
+          } else if ("HEADING_2" == namedStyle)
+            mainContent ::= IHeading(2, headingId, p)
+          else if ("HEADING_3" == namedStyle)
+            mainContent ::= IHeading(3, headingId, p)
+          else if ("NORMAL_TEXT" == namedStyle) {
+            if (p.plainText.startsWith("Abstract: "))
+              abstr = Some(List(p))
+            else
+              addParagraph(p, paragraph.getBullet != null)
+          } else {
+            System.err.println("unknown style: " + namedStyle)
+          }
+        case _: IParagraph =>
+        case i: IImage => mainContent ::= i
+      }
 
     val bibitems: List[(String, IParagraph)] =
       for (bibitem <- bibliographyParagraphs;
-           p <- convertParagraph(bibitem); if p.trimNonEmpty;
+           p <- convertTextParagraph(doc, bibitem); if p.trimNonEmpty;
            f = bibitem.getElements.asScala.toList.filter(hasPaperpileRefLink); if f.nonEmpty) yield {
         val id = getPaperpileRefLink(f.head).get
-        val text = IParagraph(simplifyIFormattedText(convertParagraphText(f, Set())))
+        val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, Set())))
         (id, text)
       }
     if (bibitems.nonEmpty)
       mainContent :+= IBibliography(bibitems)
 
 
-    IDocument(title, abstr, mainContent)
+    IDocument(title, abstr, postprocessingDocumentElements(mainContent))
   }
 
 

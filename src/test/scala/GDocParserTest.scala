@@ -18,15 +18,19 @@ class GDocParserTest extends AnyFlatSpec with should.Matchers {
   }
 
   "simplifyIFormattedText helper" should "concat plain texts" in {
-    assert(p.simplifyIFormattedText(List(IPlainText("a"), IPlainText("b"))) ==
+    assert(p.postprocessingTextFragments(List(IPlainText("a"), IPlainText("b"))) ==
       List(IPlainText("ab")))
   }
   it should "concat remove empty bold" in {
-    assert(p.simplifyIFormattedText(List(IPlainText("a"), IBold(List()), IPlainText("b"))) ==
+    assert(p.postprocessingTextFragments(List(IPlainText("a"), IBold(List()), IPlainText("b"))) ==
       List(IPlainText("ab")))
   }
   it should "concat remove empty bold string" in {
-    assert(p.simplifyIFormattedText(List(IPlainText("a"), IBold(List(IPlainText(""))), IPlainText("b"))) ==
+    assert(p.postprocessingTextFragments(List(IPlainText("a"), IBold(List(IPlainText(""))), IPlainText("b"))) ==
       List(IPlainText("ab")))
+  }
+  it should "trim whitespace" in {
+    assert(p.postprocessingTextFragments(List(IBold(List(IPlainText("test "))))) ==
+      List(IBold(List(IPlainText("test"))), IPlainText(" ")))
   }
 }

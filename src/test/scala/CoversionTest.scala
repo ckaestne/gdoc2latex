@@ -116,6 +116,14 @@ class CoversionTest extends AnyFlatSpec with should.Matchers {
     val paragraphs = getElementsInSection(parsed1,1, "Formatting Issues")
     assert(paragraphs(3) == plainParagraph("This is bold whitespace."))
   }
+  it should "handle trailing whitespace" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Formatting Issues")
+    assert(paragraphs(4) == IParagraph(List(IBold(List(IPlainText("Trailing whitespace."))), IPlainText(" "))))
+  }
+  it should "handle trailing bold whitespace" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Formatting Issues")
+    assert(paragraphs(5) == IParagraph(List(IBold(List(IPlainText("Bold trailing whitespace."))), IPlainText(" "))))
+  }
 
   it should "move formatting around words" in {
     val paragraphs = getElementsInSection(parsed1,1, "Formatting at Word Boundaries")
