@@ -25,7 +25,7 @@ WORKDIR /opt/webapp
 
 
 # compiling the project
-RUN /sbt/bin/sbt package
+RUN /sbt/bin/sbt stage
 
 
 # Expose is NOT supported by Heroku
@@ -35,5 +35,5 @@ EXPOSE 3000
 
 # Run the app.  CMD is required to run on Heroku
 # $PORT is set by Heroku			
-CMD target/universal/stage/bin/server $PORT
+CMD /opt/webapp/target/universal/stage/bin/server 3000
 
