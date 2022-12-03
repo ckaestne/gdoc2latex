@@ -24,11 +24,11 @@ Additional formatting conversion could be added as needed.
 
 ## Try it
 
-Until I exceed the free limits of Heroku, here is a version deployed online to try: https://gdoc2latex.herokuapp.com/update/1yUWsgyIDd7_C7s2SghSAaaPxmKNE0_hlcqfgbUjVci8
+Until I exceed the free limits of fly.io, here is a version deployed online to try: https://gdoc2latex.fly.dev/update/1yUWsgyIDd7_C7s2SghSAaaPxmKNE0_hlcqfgbUjVci8
 
 This link uses [this document](https://docs.google.com/document/d/1yUWsgyIDd7_C7s2SghSAaaPxmKNE0_hlcqfgbUjVci8/edit#), but simply replace the document ID with a different one to try other documents.
 
-Here is more complete example from a recent paper draft ([document](https://docs.google.com/document/d/1yZZqEWgR7C7DcrkJZeuSpXRDqCyndUP4o8pvXF-1jvc/edit) and [template folder](https://drive.google.com/drive/folders/1qY_DmTZhPDb0SnaL5S3dH-hvSKk8VV5A)): https://gdoc2latex.herokuapp.com/update/1yZZqEWgR7C7DcrkJZeuSpXRDqCyndUP4o8pvXF-1jvc/1qY_DmTZhPDb0SnaL5S3dH-hvSKk8VV5A
+Here is more complete example from a recent paper draft ([document](https://docs.google.com/document/d/1yZZqEWgR7C7DcrkJZeuSpXRDqCyndUP4o8pvXF-1jvc/edit) and [template folder](https://drive.google.com/drive/folders/1qY_DmTZhPDb0SnaL5S3dH-hvSKk8VV5A)): https://gdoc2latex.fly.dev/update/1yZZqEWgR7C7DcrkJZeuSpXRDqCyndUP4o8pvXF-1jvc/1qY_DmTZhPDb0SnaL5S3dH-hvSKk8VV5A
 
 
 
@@ -74,5 +74,5 @@ In all these commands, templateid is optional. It can either point to a Google D
 
 The server expects that *latex* is installed locally. The server will store results in the `out` directory. It uses a temporary directory of the operating system to compile the generated latex. By default it calls `pdflatex --pdf --interaction=nonstopmode main.tex` twice with a 10 second timeout each.
 
-**Docker and Heroku:** Optionally, the system can be easily deployed to Docker and Heroku. Due to needed credentials, no prebuild containers are provided, but the `Dockerfile` and the `build-and-deploy.sh` script should make this process hopefully fairly straightforward. The default Dockerfile installs all of tex-live which is huge and may not be needed.
+**Docker and Heroku/Fly.io:** Optionally, the system can be easily deployed to Docker and a hosting service like Heroku or Fly.io. Due to needed credentials, no prebuild containers are provided, but the `Dockerfile` and the `build-and-deploy.sh` script should make this process hopefully fairly straightforward. The default Dockerfile uses the full texlive installation which is huge and may not be needed.
 
