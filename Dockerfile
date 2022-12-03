@@ -33,7 +33,5 @@ EXPOSE 3000
 
 # Run the image as a non-root user
 
-# Run the app.  CMD is required to run on Heroku
-# $PORT is set by Heroku			
-CMD /opt/webapp/target/universal/stage/bin/server 3000
+ENTRYPOINT ["/opt/webapp/target/universal/stage/bin/server", "3000"]
 
