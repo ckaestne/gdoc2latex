@@ -1,6 +1,5 @@
 package edu.cmu.ckaestne.gdoc2latex.converter
 
-import converter.Util
 import edu.cmu.ckaestne.gdoc2latex.util.GDrawing
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.IOUtils
@@ -9,7 +8,6 @@ import java.io.{ByteArrayInputStream, File, InputStream}
 import java.net.URI
 import java.nio.file.{Files, Path, StandardCopyOption}
 import java.util
-import scala.io.Source
 
 
 case class LatexDoc(title: String, abstr: String, latexBody: String)
@@ -27,22 +25,30 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
   private def renderText(t: List[IFormattedText]): String = t.map(renderTextFragment).mkString
 
   private def renderTextFragment(t: IFormattedText): String = t match {
-    case IPlainText(s) =>
-      s.replace("“", "``").replace("”", "''").replace("’", "'").replace("%", "\\%").replace("&", "\\&").
-        replace("_","\\_").
-        replace("#","\\#").
-        replace("$","\\$").
-        replace("\\$\\$","$").
-        replace("α","$\\alpha$").
-        replace("β","$\\beta$").
-        replace("ϕ","$\\phi$").
-        replace("δ","$\\delta$").
-        replace("⇒","$\\Rightarrow$").
-        replace("∀","$\\forall$").
-        replace("¬","$\\neg$").
-        replace("\u200A"," ").
-        replace("\u000B"," ").
-        replace("—","--")
+    case IPlainText(s) => {
+      val x = s.replace("“", "``").replace("”", "''").replace("’", "'").replace("%", "\\%").replace("&", "\\&").
+        replace("_", "\\_").
+        replace("#", "\\#").
+        replace("$", "\\$").
+        replace("\\$\\$", "$").
+        replace("α", "$\\alpha$").
+        replace("β", "$\\beta$").
+        replace("ϕ", "$\\phi$").
+        replace("δ", "$\\delta$").
+        replace("⇒", "$\\Rightarrow$").
+        replace("∀", "$\\forall$").
+        replace("¬", "$\\neg$").
+        replace("∧", "$\\wedge$").
+        replace("⊨", "$\\models$").
+        replace("⊥", "$\\perp$").
+        replace("∣", "$\\mid$").
+        replace("∈", "$\\in$").
+        replace("\u200A", " ").
+        replace("\u000B", " ").
+        replace("—", "--")
+      //non-breaking space after some emoji
+      List("🕮","🗎","📰","🖮").foldLeft(x)((x,emoji) => x.replace(emoji+" ",emoji+"~"))
+    }
     case IBold(i) => s"\\textbf{${renderText(i)}}"
     case IItalics(i) => s"\\emph{${renderText(i)}}"
     case u@IUnderlined(i) =>
@@ -50,8 +56,8 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
       s"\\hyperref[${Util.textToId(u.getPlainText())}]{${renderText(i)}}"
     case IReference(i) => s"\\href{$i}}"
     case ICitation(refs) => "\\cite{" + refs.mkString(",") + "}"
-    case IURL(link, None) => s"\\url{$link}"
-    case IURL(link, Some(text)) => s"\\href{${link.replace("#","\\#")}}{${renderText(text)}}"
+    case IURL(link, None) => s"\\url{${link.replace("#", "\\#").replace("%", "\\%")}}"
+    case IURL(link, Some(text)) => s"\\href{${link.replace("#","\\#").replace("%","\\%")}}{${renderText(text)}}"
   }
 
   private def renderElement(t: IDocumentElement): String = t match {
@@ -115,6 +121,6 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
 
   private def imgWidth(widthInPt: Int): String =
 //    widthInPt+"pt"
-    ((widthInPt/468d)).formatted("%.2f")+"\\linewidth"
+    ((widthInPt/468d).min(1)).formatted("%.2f")+"\\linewidth"
 
 }
