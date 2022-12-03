@@ -1,6 +1,7 @@
 package edu.cmu.ckaestne.gdoc2latex.util
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
+import com.google.api.client.http.HttpRequest
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.docs.v1.model.Document
 import com.google.api.services.docs.v1.{Docs, DocsScopes}
@@ -10,6 +11,7 @@ import com.google.auth.http.HttpCredentialsAdapter
 import com.google.auth.oauth2.ServiceAccountCredentials
 
 import java.io.{ByteArrayOutputStream, FileInputStream, IOException}
+import java.net.SocketTimeoutException
 import java.security.GeneralSecurityException
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -27,10 +29,16 @@ object GDocConnection {
 
   lazy val credentials: Credentials = serviceAccountCredentials.createScoped(SCOPES.asJava)
 
+  class ExtendedTimeoutHttpCredentialsAdapter(credentials: Credentials) extends HttpCredentialsAdapter(credentials) {
+    override def initialize(request: HttpRequest): Unit = {
+      super.initialize(request)
+      request.setReadTimeout(60000)
+    }
+  }
 
   lazy val HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport
-  lazy val driveService = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, new HttpCredentialsAdapter(credentials)).setApplicationName(APPLICATION_NAME).build
-  lazy val docService = new Docs.Builder(HTTP_TRANSPORT, JSON_FACTORY, new HttpCredentialsAdapter(credentials)).setApplicationName(APPLICATION_NAME).build
+  lazy val driveService = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, new ExtendedTimeoutHttpCredentialsAdapter(credentials)).setApplicationName(APPLICATION_NAME).build
+  lazy val docService = new Docs.Builder(HTTP_TRANSPORT, JSON_FACTORY, new ExtendedTimeoutHttpCredentialsAdapter(credentials)).setApplicationName(APPLICATION_NAME).build
 
 
   @throws[IOException]
@@ -91,13 +99,18 @@ object GDocConnection {
   private def loadGDrawingContent(fileId: String): (Array[Byte], () => Array[Byte], () => Array[Byte]) = {
     val pdf = exportMedia(fileId, "application/pdf")
     val png = exportMedia(fileId, "image/png")
-    val svg = exportMedia(fileId, "image/svg")
+    val svg = exportMedia(fileId, "image/svg+xml")
     (png(), pdf, svg)
   }
 
   private def exportMedia(fileId: String, format: String): () => Array[Byte] = () => {
     val output = new ByteArrayOutputStream()
-    driveService.files().export(fileId, format).executeMediaAndDownloadTo(output)
+    try {
+      driveService.files().export(fileId, format).executeMediaAndDownloadTo(output)
+    } catch {
+      case e: SocketTimeoutException =>
+        System.err.println(s"Failed to download $fileId, $format: " + e.getMessage)
+    }
     output.toByteArray
   }
 
