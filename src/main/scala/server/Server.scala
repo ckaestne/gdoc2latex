@@ -106,8 +106,8 @@ object GDoc2LatexWorker {
       Files.write(file, content)
     }
     val startTime = System.currentTimeMillis()
-    val cmd1 = Seq("timeout", "10s", "pdflatex", "-draftmode", "--interaction=nonstopmode", "main.tex")
-    val cmd2 = Seq("timeout", "10s", "pdflatex", "--interaction=nonstopmode", "main.tex")
+    val cmd1 = Seq("timeout", "30s", "pdflatex", "-draftmode", "--interaction=nonstopmode", "main.tex")
+    val cmd2 = Seq("timeout", "30s", "pdflatex", "--interaction=nonstopmode", "main.tex")
     val (exitCode1, out1, err1) = run(cmd1, workingDirectory)
     val midTime = System.currentTimeMillis()
     println(s"pdflatex -draftmode done. ${midTime - startTime} ms, exit code $exitCode1")
