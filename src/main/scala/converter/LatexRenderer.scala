@@ -54,7 +54,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     case u@IUnderlined(i) =>
       println("Section:" + u.getPlainText())
       s"\\hyperref[${Util.textToId(u.getPlainText())}]{${renderText(i)}}"
-    case IReference(i) => s"\\href{$i}}"
+    case IReference(i) => s"\\href{$i}"
     case ICitation(refs) => "\\cite{" + refs.mkString(",") + "}"
     case IURL(link, None) => s"\\url{${link.replace("#", "\\#").replace("%", "\\%")}}"
     case IURL(link, Some(text)) => s"\\href{${link.replace("#","\\#").replace("%","\\%")}}{${renderText(text)}}"
