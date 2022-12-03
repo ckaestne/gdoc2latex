@@ -25,7 +25,7 @@ WORKDIR /opt/webapp
 
 
 # compiling the project
-RUN sbt/bin/sbt package
+RUN /sbt/bin/sbt package
 
 
 # Expose is NOT supported by Heroku
