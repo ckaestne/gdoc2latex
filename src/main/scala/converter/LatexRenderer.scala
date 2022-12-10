@@ -64,7 +64,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     case IParagraph(c) => renderText(c) + "\n"
     case IHeading(level, id, text) =>
       val l = if (level == 1) "section" else if (level == 2) "subsection" else "subsubsection"
-      val anchor = id.map(headingId => s"\\label{$headingId}\n").getOrElse("")
+      val anchor = id.map(headingId => s"\\label{$headingId}").getOrElse("")
       s"\\$l{${renderText(text.content)}}$anchor"
 
     case IBulletList(bullets) =>
