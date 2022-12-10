@@ -16,7 +16,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
 
   def render(doc: IDocument): LatexDoc = LatexDoc(
     renderText(doc.title.content),
-    doc.abstr.map(p => p.map(renderParagraph).mkString("\n\n")).getOrElse(""),
+    doc.abstr.map(p => p.map(p=>renderParagraph(p).replace("Abstract: ","")).mkString("\n\n")).getOrElse(""),
     doc.content.map(renderElement).mkString("\n")
   )
 
