@@ -40,7 +40,7 @@ object GDoc2LatexWorker {
     println(s"loading gdoc $gdocId")
     val context = gdocId.templateId.map(Context.fromGoogleId).getOrElse(Context.defaultContext)
 
-    val doc = GDocConnection.getDocument(gdocId.docId, true)
+    val doc = GDocConnection.getDocument(gdocId.docId, Server.withSuggestions)
 
     //keep raw json output from gdoc for debugging
     gdocId.docId.synchronized {
@@ -201,7 +201,7 @@ case class Routes() extends cask.MainRoutes {
         htmlResp("Error",
           h1("Cannot read requested document"),
           p("Error message: ", it(message), s", error code $code"),
-          p("Try making the document public or share it with ", tt(SERVICE_ACCOUNT_EMAIL)))
+          p("Try making the document public or share it with ", tt(SERVICE_ACCOUNT_EMAIL),if (Server.withSuggestions) ". This server is configured to request all suggestions, the document needs to be shared in 'Commenter' mode or the server configuration needs to be changed." else "."))
       case e: Exception =>
         e.printStackTrace()
         Response("Failed " + e.getMessage, 400)
@@ -321,6 +321,7 @@ case class Routes() extends cask.MainRoutes {
 
 object Server extends cask.Main {
   var _port: Int = 3000
+  val withSuggestions: Boolean = true // whether to request the document with all suggestions -- requires permissions as a commenter, not just viewer
 
   override def main(args: Array[String]): Unit = {
     if (args.isEmpty)
