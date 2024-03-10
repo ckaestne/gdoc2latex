@@ -110,10 +110,10 @@ object GDoc2LatexWorker {
     val cmd2 = Seq("timeout", "10s", "pdflatex", "--interaction=nonstopmode", "main.tex")
     val (exitCode1, out1, err1) = run(cmd1, workingDirectory)
     val midTime = System.currentTimeMillis()
-    println(s"pdflatex -draftmode done. ${midTime - startTime} ms, exit code $exitCode1")
+    println(s"${cmd1.mkString(" ")} done. ${midTime - startTime} ms, exit code $exitCode1")
     val (exitCode2, out2, err2) = run(cmd2, workingDirectory)
     val endTime = System.currentTimeMillis()
-    println(s"pdflatex done. ${endTime - midTime} ms, exit code $exitCode2")
+    println(s"${cmd2.mkString(" ")} done. ${endTime - midTime} ms, exit code $exitCode2")
     val success = (exitCode1 == 0) && (exitCode2 == 0)
 
     gdocId.docId.synchronized {
@@ -123,8 +123,8 @@ object GDoc2LatexWorker {
         Files.deleteIfExists(pdfPath(gdocId))
       Files.write(texPath(gdocId), input.mainFileContent)
       Files.writeString(logPath(gdocId),
-        "> " + cmd1.mkString(" ") + "\n\n" + out1 + "\n\n" +
-          "> " + cmd2.mkString(" ") + "\n\n" + out2)
+        "> " + cmd1.mkString(" ") + " -- exit with "+exitCode1+ "\n\n" + out1 + "\n\n" +
+          "> " + cmd2.mkString(" ")+ " -- exit with "+exitCode2 + "\n\n" + out2)
       Files.writeString(errPath(gdocId), err1 + "\n\n" + err2)
     }
 
