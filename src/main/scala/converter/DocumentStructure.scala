@@ -21,7 +21,7 @@ case class IPlainText(text: String) extends IFormattedText {
   def getPlainText() = text
 }
 
-trait ISimpleFormattedSequence extends IFormattedText {
+sealed trait ISimpleFormattedSequence extends IFormattedText {
   def elements: List[IFormattedText]
   private val plain = elements.map(_.getPlainText()).mkString
   if (plain.nonEmpty && plain.head == ' ')
@@ -40,6 +40,11 @@ case class IBold(elements: List[IFormattedText]) extends ISimpleFormattedSequenc
 case class IItalics(elements: List[IFormattedText]) extends ISimpleFormattedSequence
 
 case class IUnderlined(elements: List[IFormattedText]) extends ISimpleFormattedSequence
+
+case class IHighlight(elements: List[IFormattedText], color: String) extends ISimpleFormattedSequence
+
+case class ISub(elements: List[IFormattedText]) extends ISimpleFormattedSequence
+case class ISup(elements: List[IFormattedText]) extends ISimpleFormattedSequence
 
 case class IReference(anchor: String) extends IFormattedText {
   def getPlainText() = "$REF"
@@ -74,7 +79,7 @@ case class IBibliography(items: List[(String /*key*/ , IParagraph)]) extends IDo
 
 case class IHeading(level: Int, id: Option[String], text: IParagraph) extends IDocumentElement
 
-case class IImage(id: String, contentUri: String, caption: Option[IParagraph], widthPt: Int) extends IDocumentElement
+case class IImage(id: String, contentUri: String, caption: Option[IParagraph], altText: Option[String], widthPt: Int) extends IDocumentElement
 
 case class ICode(language: Option[String], code: String, caption: Option[IParagraph]) extends IDocumentElement
 

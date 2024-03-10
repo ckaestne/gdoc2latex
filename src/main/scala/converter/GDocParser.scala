@@ -28,7 +28,7 @@ class GDocParser {
       var result = 1
       val head = seq.head
       var tail = seq.tail
-      while (tail.nonEmpty && continuesFormatting(head, tail.head)) {
+      while (tail.nonEmpty && tail.head.getTextRun.getContent!="\n" && continuesFormatting(head, tail.head)) {
         result += 1
         tail = tail.tail
       }
@@ -108,6 +108,35 @@ class GDocParser {
     def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = applyAfterTrim(IItalics.apply)
   }
 
+  private object HighlightingFormatting extends SequenceFormatting {
+    override def hasFormatting(e: ParagraphElement): Boolean =
+      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getBackgroundColor!=null else false
+
+
+    private def rgbToHtmlColor(r: Float, g: Float, b: Float): String =
+      f"#${(r * 255).toInt}%02x${(g * 255).toInt}%02x${(b * 255).toInt}%02x"
+
+
+    def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = {
+      val color = e.getTextRun.getTextStyle.getBackgroundColor.getColor.getRgbColor
+      applyAfterTrim(x=>IHighlight.apply(x,rgbToHtmlColor(color.getRed, color.getGreen, color.getBlue)))
+    }
+  }
+
+  private object SubFormatting extends SequenceFormatting {
+    override def hasFormatting(e: ParagraphElement): Boolean =
+      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getBaselineOffset == "SUBSCRIPT" else false
+
+    def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = applyAfterTrim(ISub.apply)
+  }
+
+  private object SupFormatting extends SequenceFormatting {
+    override def hasFormatting(e: ParagraphElement): Boolean =
+      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getBaselineOffset == "SUPSCRIPT" else false
+
+    def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = applyAfterTrim(ISup.apply)
+  }
+
   private object LinkFormatting extends SequenceFormatting {
     override def hasFormatting(e: ParagraphElement): Boolean =
       e.getTextRun != null &&
@@ -136,7 +165,7 @@ class GDocParser {
     }
   }
 
-  private val sequenceFormattings = List(BoldFormatting, ItalicsFormatting, LinkFormatting, UnderlinedFormatting)
+  private val sequenceFormattings = List(BoldFormatting, ItalicsFormatting, LinkFormatting, UnderlinedFormatting, SubFormatting, SupFormatting, HighlightingFormatting)
 
   private def isComment(e: ParagraphElement): Boolean =
     if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getStrikethrough else false
@@ -193,7 +222,12 @@ class GDocParser {
     }
     val uri = obj.getInlineObjectProperties.getEmbeddedObject.getImageProperties.getContentUri
     val width = obj.getInlineObjectProperties.getEmbeddedObject.getSize.getWidth.getMagnitude.toInt
-    Some(IImage(objectId, uri, None, width))
+    val altText = obj.getInlineObjectProperties.getEmbeddedObject.getDescription
+
+    if (obj.getInlineObjectProperties.getEmbeddedObject.getImageProperties.getCropProperties.size()>0)
+      System.err.println(s"    Warning: Image cropping not supported $uri")
+
+    Some(IImage(objectId, uri, None, Option(altText), width))
   }
 
   /**
@@ -230,8 +264,8 @@ class GDocParser {
         ICode(if (lang!="") Some(lang) else None, code, caption)::postprocessingDocumentElements(t)
       }
     // image followed by italics paragraph is image with caption
-    case IImage(id, uri, None, width) :: IParagraph(inner) :: tail if inner.size == 1 && inner.head.isInstanceOf[IItalics] =>
-      IImage(id, uri, Some(IParagraph(inner.head.asInstanceOf[IItalics].elements)), width) :: postprocessingDocumentElements(tail)
+    case IImage(id, uri, None, alt, width) :: IParagraph(inner) :: tail if inner.size == 1 && inner.head.isInstanceOf[IItalics] =>
+      IImage(id, uri, Some(IParagraph(inner.head.asInstanceOf[IItalics].elements)), alt, width) :: postprocessingDocumentElements(tail)
     case head :: tail => head :: postprocessingDocumentElements(tail)
     case Nil => Nil
   }
@@ -257,6 +291,21 @@ class GDocParser {
       val newTail = postprocessingTextFragments(tail)
       if (newI.isEmpty)
         newTail else IItalics(newI) :: newTail
+    case IHighlight(i, color) :: tail =>
+      val newI = postprocessingTextFragments(i)
+      val newTail = postprocessingTextFragments(tail)
+      if (newI.isEmpty)
+        newTail else IHighlight(newI, color) :: newTail
+    case ISub(i) :: tail =>
+      val newI = postprocessingTextFragments(i)
+      val newTail = postprocessingTextFragments(tail)
+      if (newI.isEmpty)
+        newTail else ISub(newI) :: newTail
+    case ISup(i) :: tail =>
+      val newI = postprocessingTextFragments(i)
+      val newTail = postprocessingTextFragments(tail)
+      if (newI.isEmpty)
+        newTail else ISup(newI) :: newTail
     case (i: IPlainText) :: tail => i :: postprocessingTextFragments(tail)
     case (i: IReference) :: tail => i :: postprocessingTextFragments(tail)
     case (i: ICitation) :: tail => i :: postprocessingTextFragments(tail)
@@ -339,7 +388,7 @@ class GDocParser {
     val bibitems: List[(String, IParagraph)] =
       for (bibitem <- bibliographyParagraphs;
            p <- convertTextParagraph(doc, bibitem); if p.trimNonEmpty;
-           f = bibitem.getElements.asScala.toList.filter(hasPaperpileRefLink); if f.nonEmpty) yield {
+           f = bibitem.getElements.asScala.toList.take(1).filter(hasPaperpileRefLink)++bibitem.getElements.asScala.toList.drop(1); if f.nonEmpty) yield {
         val id = getPaperpileRefLink(f.head).get
         val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, Set())))
         (id, text)

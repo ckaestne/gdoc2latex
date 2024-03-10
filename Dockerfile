@@ -5,7 +5,7 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive TZ=US/Eastern apt-get install tex-common -y 
 
 # securing latex
-ADD ./config/texmf.cnf /etc/texmf/texmf.d/my.cnf
+ADD ../../mlip-book/config/texmf.cnf /etc/texmf/texmf.d/my.cnf
 RUN update-texmf
 
 # installing java and sbt

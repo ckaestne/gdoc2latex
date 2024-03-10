@@ -12,7 +12,8 @@ object GDoc2LatexCLI extends App {
   case class Config(
                      documentid: String = "",
                      out: Option[File] = None,
-                     template: Option[File] = None
+                     template: Option[File] = None,
+                     withSuggestions: Boolean = false
                    )
 
 
@@ -30,6 +31,7 @@ object GDoc2LatexCLI extends App {
         .validate(f => if (f.exists()) success else failure("Template file does not exist"))
         .action((x, c) => c.copy(template = Some(x)))
         .text("Latex template in which to replace \\TITLE, \\ABSTRACT, and \\CONTENT"),
+      opt[Boolean]("with-suggestions").action((x,c)=>c.copy(withSuggestions = x)).text("Convert document with all suggestions accepted (default: false)"),
       help("help").text("prints this usage text"),
       arg[String]("<documentid>")
         .action((x, c) => c.copy(documentid = x))
@@ -41,8 +43,7 @@ object GDoc2LatexCLI extends App {
   // OParser.parse returns Option[Config]
   OParser.parse(parser1, args, Config()) match {
     case Some(config) =>
-      val doc = GDocConnection.getDocument(config.documentid)
-
+      val doc = GDocConnection.getDocument(config.documentid, config.withSuggestions)
       val context = config.template.map(Context.fromFile).getOrElse(Context.defaultContext)
       val ldoc = new GDocParser().convert(doc)
 

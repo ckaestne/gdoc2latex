@@ -1,8 +1,9 @@
 name := "gdoc2latex"
+organization := "edu.cmu.cs.mlip"
 
-version := "0.1"
+version := "0.2.2"
 
-scalaVersion := "2.13.6"
+scalaVersion := "2.13.10"
 
 enablePlugins(JavaAppPackaging)
 Compile / mainClass := Some("edu.cmu.ckaestne.gdoc2latex.cli.GDoc2LatexCLI")

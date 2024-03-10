@@ -40,7 +40,7 @@ object GDoc2LatexWorker {
     println(s"loading gdoc $gdocId")
     val context = gdocId.templateId.map(Context.fromGoogleId).getOrElse(Context.defaultContext)
 
-    val doc = GDocConnection.getDocument(gdocId.docId)
+    val doc = GDocConnection.getDocument(gdocId.docId, true)
 
     //keep raw json output from gdoc for debugging
     gdocId.docId.synchronized {

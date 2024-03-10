@@ -76,7 +76,7 @@ class CoversionTest extends AnyFlatSpec with should.Matchers {
     assert(paragraphs==List())
   }
 
-  "Text formatting" should "recognize bold" in {
+  "Basic text formatting" should "recognize bold" in {
     val paragraphs = getElementsInSection(parsed1,1, "Paragraph Style")
     assert(paragraphs(0) == IParagraph(List(IPlainText("This is "), IBold(List(IPlainText("bold"))), IPlainText("."))))
   }
@@ -100,7 +100,20 @@ class CoversionTest extends AnyFlatSpec with should.Matchers {
     val paragraphs = getElementsInSection(parsed1,1, "Paragraph Style")
     assert(paragraphs(5) == IParagraph(List(IPlainText("This "), IItalics(List(IPlainText("is "), IBold(List(IPlainText("bold"))), IPlainText(" in italics"))), IPlainText("."))))
   }
-  it should "ignore formatting within words" ignore {
+  it should "recognize background colors" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Paragraph Style")
+    assert(paragraphs(6) == IParagraph(List(IPlainText("This has "), IHighlight(List(IPlainText("yellow")),"#ffff00"), IPlainText(" background."))))
+  }
+  it should "recognize background colors 2" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Paragraph Style")
+    assert(paragraphs(7) == IParagraph(List(IPlainText("This has "), IHighlight(List(IPlainText("orange")),"#ff9900"), IPlainText(" background."))))
+  }
+  it should "recognize background colors and italics in right priority" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Paragraph Style")
+    assert(paragraphs(8) == IParagraph(List(IPlainText("This has "), IItalics(List(IHighlight(List(IPlainText("italics with yellow")),"#ffff00"))), IPlainText(" background."))))
+  }
+
+  "Advanced text formatting" should "ignore formatting within words" ignore {
     val paragraphs = getElementsInSection(parsed1,1, "Formatting Issues")
     assert(paragraphs(0) == plainParagraph("This is invalid bold."))
   }
@@ -143,6 +156,23 @@ class CoversionTest extends AnyFlatSpec with should.Matchers {
   }
   //
 
+  "Formatting priority" should "be ensured" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Whole-Paragraph Formatting")
+
+    assert(paragraphs(0) == IParagraph(List(IItalics(List(IPlainText("One"))))))
+    assert(paragraphs(1) == IParagraph(List(IBold(List(IItalics(List(IPlainText("Two"))))))))
+    assert(paragraphs(2) == IParagraph(List(IItalics(List(IPlainText("Three"))))))
+
+    assert(paragraphs(3) == IParagraph(List(IBold(List(IPlainText("Four"))))))
+    assert(paragraphs(4) == IParagraph(List(IBold(List(IItalics(List(IPlainText("Five"))))))))
+    assert(paragraphs(5) == IParagraph(List(IBold(List(IPlainText("Six"))))))
+
+    assert(paragraphs(6) == IParagraph(List(IHighlight(List(IPlainText("Seven")),"#ffff00"))))
+    assert(paragraphs(7) == IParagraph(List(IItalics(List(IHighlight(List(IPlainText("Eight")),"#ffff00"))))))
+    assert(paragraphs(8) == IParagraph(List(IHighlight(List(IPlainText("Nine")),"#ffff00"))))
+
+  }
+
   "Code" should "be detected correctly" in {
     val codeFragments = parsed1.content.filter(_.isInstanceOf[ICode])
     assert(codeFragments(0) == ICode(Some("java"),"this\nis code\n",None))
@@ -150,4 +180,35 @@ class CoversionTest extends AnyFlatSpec with should.Matchers {
     assert(codeFragments(2) == ICode(None,"  more\n  code",None))
 
   }
+
+  "Images" should "be detected with a caption (remove italics formatting)" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Image")
+
+    assert(paragraphs(0).isInstanceOf[IImage])
+    assert(paragraphs(0).asInstanceOf[IImage].caption == Some(IParagraph(List(IPlainText("One")))))
+  }
+
+  it should "be detected without a caption" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Image")
+
+    assert(paragraphs(2).isInstanceOf[IImage])
+    assert(paragraphs(2).asInstanceOf[IImage].caption == None)
+  }
+
+  it should "be detected with yellow caption" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Image")
+
+    assert(paragraphs(4).isInstanceOf[IImage])
+    assert(paragraphs(4).asInstanceOf[IImage].caption == Some(IParagraph(List(IHighlight(List(IPlainText("Two")),"#ffff00")))))
+  }
+
+  it should "be cropped correctly" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Image")
+
+    assert(paragraphs(4).isInstanceOf[IImage])
+    assert(paragraphs(4).asInstanceOf[IImage].caption == Some(IParagraph(List(IHighlight(List(IPlainText("Two")),"#ffff00")))))
+
+  }
+
+
 }
