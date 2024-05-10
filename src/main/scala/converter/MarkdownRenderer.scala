@@ -43,7 +43,7 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
   }
 
   protected def renderElement(t: IDocumentElement): String = t match {
-    case IParagraph(c) => renderText(c) + "\n"
+    case IParagraph(c, _) => renderText(c) + "\n"
     case IHeading(level, id, text) =>
       val l = "#" * (level+1)
       //      val anchor = id.map(headingId => s"\\label{$headingId}\n").getOrElse("")
@@ -58,7 +58,8 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
 
     case IImage(id: String, uri: String, caption: Option[IParagraph], altTextOption: Option[String], width: Int) => if (ignoreImages) "" else {
       val cap = caption.map(p => renderText(p.content)).getOrElse("")
-      val altText = altTextOption.getOrElse("")
+      val altText = altTextOption.getOrElse("").trim
+      val altTextMdEncoded = altText.replace("[","\\[").replace("]","\\]").replace("*","\\*").replace("\n", " ")
 
       var address = uri
       if (downloadImages) {
@@ -69,7 +70,7 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
           case None => System.err.println("Cannot download image: "+uri)
         }
       }
-      imgRenderingFormat.replace("$cap",cap).replace("$address", address).replace("$alt",altText)
+      imgRenderingFormat.replace("$cap",cap).replace("$address", address).replace("$altTextMdEncoded",altTextMdEncoded).replace("$alt",altText)
     }
 
     case ICode(lang, code, caption) =>

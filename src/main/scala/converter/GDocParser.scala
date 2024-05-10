@@ -11,12 +11,12 @@ class GDocParser {
   private def convertParagraph(doc: Document, p: Paragraph): Option[IDocumentElement] =
     if (p.getElements == null) None
     else extractImage(doc, p).orElse(
-      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList)))))
+      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList)), findIndexTerms(p))))
 
   private def convertTextParagraph(doc: Document, p: Paragraph): Option[IParagraph] =
     if (p.getElements == null) None
     else
-      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList))))
+      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList)), findIndexTerms(p)))
 
 
   private sealed trait SequenceFormatting {
@@ -28,7 +28,7 @@ class GDocParser {
       var result = 1
       val head = seq.head
       var tail = seq.tail
-      while (tail.nonEmpty && tail.head.getTextRun.getContent!="\n" && continuesFormatting(head, tail.head)) {
+      while (tail.nonEmpty && tail.head.getTextRun.getContent != "\n" && continuesFormatting(head, tail.head)) {
         result += 1
         tail = tail.tail
       }
@@ -94,9 +94,10 @@ class GDocParser {
 
     def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = applyAfterTrim(IBold.apply)
   }
+
   private object UnderlinedFormatting extends SequenceFormatting {
     override def hasFormatting(e: ParagraphElement): Boolean =
-      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getUnderline && e.getTextRun.getTextStyle.getLink==null else false
+      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getUnderline && e.getTextRun.getTextStyle.getLink == null else false
 
     def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = applyAfterTrim(IUnderlined.apply)
   }
@@ -110,7 +111,7 @@ class GDocParser {
 
   private object HighlightingFormatting extends SequenceFormatting {
     override def hasFormatting(e: ParagraphElement): Boolean =
-      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getBackgroundColor!=null else false
+      if (e.getTextRun != null && e.getTextRun.getTextStyle != null) e.getTextRun.getTextStyle.getBackgroundColor != null else false
 
 
     private def rgbToHtmlColor(r: Float, g: Float, b: Float): String =
@@ -119,7 +120,7 @@ class GDocParser {
 
     def getFormatter(e: ParagraphElement): List[IFormattedText] => List[IFormattedText] = {
       val color = e.getTextRun.getTextStyle.getBackgroundColor.getColor.getRgbColor
-      applyAfterTrim(x=>IHighlight.apply(x,rgbToHtmlColor(color.getRed, color.getGreen, color.getBlue)))
+      applyAfterTrim(x => IHighlight.apply(x, rgbToHtmlColor(color.getRed, color.getGreen, color.getBlue)))
     }
   }
 
@@ -160,7 +161,7 @@ class GDocParser {
       } else {
         if (link == inner.map(_.getPlainText()).mkString)
           List(IURL(link, None))
-        else List(IURL(link, Some(inner)))
+        else applyAfterTrim(i => IURL(link, Some(i)))(inner)
       }
     }
   }
@@ -208,7 +209,8 @@ class GDocParser {
       return None
     }
     val text = p.getElements.asScala.map(e => {
-      val t = e.getTextRun; if (t == null) "" else t.getContent
+      val t = e.getTextRun;
+      if (t == null) "" else t.getContent
     }).mkString
     if (text.trim.nonEmpty) {
       System.err.println(s"Text in the same paragraph as inline object not supported \"$text\"")
@@ -224,7 +226,7 @@ class GDocParser {
     val width = obj.getInlineObjectProperties.getEmbeddedObject.getSize.getWidth.getMagnitude.toInt
     val altText = obj.getInlineObjectProperties.getEmbeddedObject.getDescription
 
-    if (obj.getInlineObjectProperties.getEmbeddedObject.getImageProperties.getCropProperties.size()>0)
+    if (obj.getInlineObjectProperties.getEmbeddedObject.getImageProperties.getCropProperties.size() > 0)
       System.err.println(s"    Warning: Image cropping not supported $uri")
 
     Some(IImage(objectId, uri, None, Option(altText), width))
@@ -236,36 +238,36 @@ class GDocParser {
    */
   private def postprocessingDocumentElements(l: List[IDocumentElement]): List[IDocumentElement] = l match {
     // detect code fragments
-    case (p@IParagraph(_)) :: tail if p.plainText.trim startsWith "```" =>
+    case (p@IParagraph(_, _)) :: tail if p.plainText.trim startsWith "```" =>
       var t = tail
-      val text = p.plainText.replace('\u000B','\n')
-      val lang = text.trim.drop(3).takeWhile(_!='\n').trim // text after ```
-      var code = text.dropWhile(_!='\n').drop(1).replaceAll("```\\s*$", "") // skip first line and remove closing ``` if there
-      var end = text.trim.length>3 && text.trim.endsWith("```")
+      val text = p.plainText.replace('\u000B', '\n')
+      val lang = text.trim.drop(3).takeWhile(_ != '\n').trim // text after ```
+      var code = text.dropWhile(_ != '\n').drop(1).replaceAll("```\\s*$", "") // skip first line and remove closing ``` if there
+      var end = text.trim.length > 3 && text.trim.endsWith("```")
       var caption: Option[IParagraph] = None
       while (t.nonEmpty && t.head.isInstanceOf[IParagraph] && !end) {
         val p = t.head.asInstanceOf[IParagraph]
-        val text = p.plainText.replace('\u000B','\n')
+        val text = p.plainText.replace('\u000B', '\n')
         end = text.trim.endsWith("```")
-        code = (if (code.nonEmpty) code +"\n" else "") +text.replaceAll("```\\s*$", "")
+        code = (if (code.nonEmpty) code + "\n" else "") + text.replaceAll("```\\s*$", "")
         t = t.tail
       }
       if (end && t.nonEmpty && t.head.isInstanceOf[IParagraph]) {
         val p = t.head.asInstanceOf[IParagraph]
-        if (p.content.size==1 && p.content.head.isInstanceOf[IItalics]) {
-          caption= Some(IParagraph(p.content.head.asInstanceOf[IItalics].elements))
-          t=t.tail
+        if (p.content.size == 1 && p.content.head.isInstanceOf[IItalics]) {
+          caption = Some(IParagraph(p.content.head.asInstanceOf[IItalics].elements))
+          t = t.tail
         }
       }
       if (!end) {
         //not a valid code sequence
-        p:: postprocessingDocumentElements(tail)
+        p :: postprocessingDocumentElements(tail)
       } else {
-        ICode(if (lang!="") Some(lang) else None, code, caption)::postprocessingDocumentElements(t)
+        ICode(if (lang != "") Some(lang) else None, code, caption) :: postprocessingDocumentElements(t)
       }
     // image followed by italics paragraph is image with caption
-    case IImage(id, uri, None, alt, width) :: IParagraph(inner) :: tail if inner.size == 1 && inner.head.isInstanceOf[IItalics] =>
-      IImage(id, uri, Some(IParagraph(inner.head.asInstanceOf[IItalics].elements)), alt, width) :: postprocessingDocumentElements(tail)
+    case IImage(id, uri, None, alt, width) :: IParagraph(inner, indexTerms) :: tail if inner.size == 1 && inner.head.isInstanceOf[IItalics] =>
+      IImage(id, uri, Some(IParagraph(inner.head.asInstanceOf[IItalics].elements, indexTerms)), alt, width) :: postprocessingDocumentElements(tail)
     case head :: tail => head :: postprocessingDocumentElements(tail)
     case Nil => Nil
   }
@@ -362,7 +364,7 @@ class GDocParser {
 
     for (paragraph <- mainParagraphs.reverse; pe <- convertParagraph(doc, paragraph))
       pe match {
-        case p: IParagraph if p.trimNonEmpty =>
+        case p: IParagraph if p.trimNonEmpty || p.indexTerms.nonEmpty =>
           val namedStyle = paragraph.getParagraphStyle.getNamedStyleType
           val headingId = Option(paragraph.getParagraphStyle.getHeadingId)
           if ("TITLE" == namedStyle)
@@ -388,7 +390,7 @@ class GDocParser {
     val bibitems: List[(String, IParagraph)] =
       for (bibitem <- bibliographyParagraphs;
            p <- convertTextParagraph(doc, bibitem); if p.trimNonEmpty;
-           f = bibitem.getElements.asScala.toList.take(1).filter(hasPaperpileRefLink)++bibitem.getElements.asScala.toList.drop(1); if f.nonEmpty) yield {
+           f = bibitem.getElements.asScala.toList.take(1).filter(hasPaperpileRefLink) ++ bibitem.getElements.asScala.toList.drop(1); if f.nonEmpty) yield {
         val id = getPaperpileRefLink(f.head).get
         val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, Set())))
         (id, text)
@@ -398,6 +400,32 @@ class GDocParser {
 
 
     IDocument(title, abstr, postprocessingDocumentElements(mainContent))
+  }
+
+
+  //detect light gray background as indexed keywords
+  private def isIndex(e: ParagraphElement): Boolean =
+    if (e.getTextRun != null && e.getTextRun.getTextStyle != null && e.getTextRun.getTextStyle.getBackgroundColor != null && e.getTextRun.getTextStyle.getBackgroundColor.getColor != null && e.getTextRun.getTextStyle.getBackgroundColor.getColor.getRgbColor != null) {
+      val col = e.getTextRun.getTextStyle.getBackgroundColor.getColor.getRgbColor
+      col.getRed > 0.69 && col.getRed < 0.91 && Math.abs(col.getRed - col.getBlue) < 0.1 && Math.abs(col.getRed - col.getGreen) < 0.1
+    } else false
+
+
+  private def findIndexTerms(p: Paragraph): List[String] = {
+    var result: List[String] = Nil
+    var els = p.getElements.asScala.toList
+    var prefix = ""
+    while (els.nonEmpty) {
+      val el = els.head
+      els = els.tail
+      if (isIndex(el) && els.nonEmpty && isIndex(els.head))
+        prefix = prefix + el.getTextRun.getContent
+      else if (isIndex(el)) {
+        result ::= prefix + el.getTextRun.getContent
+        prefix = ""
+      }
+    }
+    result
   }
 
 

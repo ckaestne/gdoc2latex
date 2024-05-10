@@ -67,7 +67,7 @@ sealed trait IDocumentElement
 /**
  * a paragraph is a piece of formatted text without line breaks -- could describe a paragraph, a heading, or any other sequence of formatted text
  */
-case class IParagraph(content: List[IFormattedText]) extends IDocumentElement {
+case class IParagraph(content: List[IFormattedText], indexTerms: List[String]=Nil) extends IDocumentElement {
   def trimNonEmpty: Boolean = plainText.trim.nonEmpty
 
   def plainText = content.map(_.getPlainText()).mkString

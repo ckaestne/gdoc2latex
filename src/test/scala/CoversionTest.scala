@@ -154,6 +154,10 @@ class CoversionTest extends AnyFlatSpec with should.Matchers {
     val paragraphs = getElementsInSection(parsed1,1, "Formatting at Word Boundaries")
     assert(paragraphs(3) == IParagraph(List(IPlainText("This is "), IBold(List(IPlainText("bold."))))))
   }
+  it should "move formatting for links also around words" in {
+    val paragraphs = getElementsInSection(parsed1,1, "Formatting at Word Boundaries")
+    assert(paragraphs(4) == IParagraph(List(IPlainText("This is a "), IURL("http://foo.com",Some(List(IPlainText("link")))), IPlainText("."))))
+  }
   //
 
   "Formatting priority" should "be ensured" in {

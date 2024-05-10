@@ -71,14 +71,16 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     case IURL(link, Some(text)) => s"\\href{${link.replace("#","\\#").replace("%","\\%")}}{${renderText(text)}}"
   }
 
+  protected def formatIndexedTerm(term: String): String = term.trim
+
   protected def itemEnv: String = "compactitem"
 
   protected def renderElement(t: IDocumentElement): String = t match {
-    case IParagraph(c) => renderText(c) + "\n"
+    case IParagraph(c, idx) => renderIndex(idx) + renderText(c) +"\n"
     case IHeading(level, id, text) =>
       val l = if (level == 1) "section" else if (level == 2) "subsection" else "subsubsection"
       val anchor = id.map(headingId => s"\\label{$headingId}").getOrElse("")
-      s"\\$l{${renderText(text.content)}}$anchor"
+      s"\\$l{${renderText(text.content)}}$anchor"+renderIndex(text.indexTerms)
 
     case IBulletList(bullets) =>
       bullets.map(renderElement).mkString(s"\\begin{$itemEnv}\n\t\\item ", "\n\t\\item ", s"\n\\end{$itemEnv}\n")
@@ -102,15 +104,18 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     case ICode(lang, code, caption) =>
       val config = (lang.map("language="+_) :: caption.map(p=> "title={"+renderText(p.content)+"}") :: Nil).flatten
       val configTxt = if (config.isEmpty) "" else config.mkString("[",",","]")
-      s"\\begin{minipage}{\\linewidth}\\begin{lstlisting}$configTxt\n$code\\end{lstlisting}\\end{minipage}\n"
+      val index = caption.map(_.indexTerms).map(renderIndex).getOrElse("")
+      s"\\begin{minipage}{\\linewidth}\\begin{lstlisting}$configTxt\n$code\\end{lstlisting}$index\\end{minipage}\n"
   }
+
+  protected def renderIndex(idx: List[String]): String = idx.map(formatIndexedTerm).map(t=>"\\index{"+t+"}").mkString
 
   protected def imageLabel(img: IImage): String =
     s"\\label{${img.id}}"
 
   protected def imageCaption(img: IImage): String =
-    img.caption.map(p => "\\caption{" + renderText(p.content) + "}\n").getOrElse("")+
-      img.altText.map(p=>"\\alt{"+p+"}\n").getOrElse("")
+    img.caption.map(p => "\\caption{" + renderText(p.content) + "}\n"+renderIndex(p.indexTerms)).getOrElse("")+
+      img.altText.map(p=>"\\alt{"+renderPlainText(p)+"}\n").getOrElse("")
 
   protected def imageLocation = "h!tp"
 
