@@ -48,7 +48,7 @@ object GDoc2LatexWorker {
     }
 
     val ldoc = new GDocParser().convert(doc)
-    context.render(new LatexRenderer(ignoreImages = false, downloadImages = true).render(ldoc))
+    context.render(new LatexRenderer(ignoreImages = false, downloadImages = true, imgDir=targetDirectory.toFile).render(ldoc))
   }
 
   /**
