@@ -40,6 +40,7 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
     case ICitation(refs) => ??? //"\\cite{" + refs.mkString(",") + "}"
     case IURL(link, None) => s"[$link]($link)"
     case IURL(link, Some(text)) => s"[${renderText(text)}]($link)"
+    case IFootnote(text) => s"[Footnote: ${text.map(renderParagraph).mkString}]"
   }
 
   protected def renderElement(t: IDocumentElement): String = t match {

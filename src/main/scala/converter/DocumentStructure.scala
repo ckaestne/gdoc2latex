@@ -58,6 +58,10 @@ case class IURL(link: String, inner: Option[List[IFormattedText]]) extends IForm
   def getPlainText() = inner.map(_.map(_.getPlainText()).mkString).getOrElse(link)
 }
 
+case class IFootnote(elements: List[IParagraph]) extends IFormattedText {
+  def getPlainText() = "Footnote: "+elements.map(_.plainText).mkString
+}
+
 
 /**
  * heading or paragraph or similar toplevel structure

@@ -8,15 +8,15 @@ import scala.jdk.CollectionConverters._
 class GDocParser {
 
 
-  private def convertParagraph(doc: Document, p: Paragraph): Option[IDocumentElement] =
+  private def convertParagraph(doc: Document, context: Context, p: Paragraph): Option[IDocumentElement] =
     if (p.getElements == null) None
     else extractImage(doc, p).orElse(
-      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList)), findIndexTerms(p))))
+      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList, context)), findIndexTerms(p))))
 
-  private def convertTextParagraph(doc: Document, p: Paragraph): Option[IParagraph] =
+  private def convertTextParagraph(doc: Document, context: Context, p: Paragraph): Option[IParagraph] =
     if (p.getElements == null) None
     else
-      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList)), findIndexTerms(p)))
+      Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList, context)), findIndexTerms(p)))
 
 
   private sealed trait SequenceFormatting {
@@ -173,27 +173,32 @@ class GDocParser {
 
   private def cleanText(str: String) = str.replace("\n", "")
 
+
+  case class Context(footnotes: Map[String, List[IParagraph]])
+
   /**
    * text convertion: italics, bold, and links/references/citations are recognized and need to start/stop at word boundaries. strikethrough is ignored as comment at the character level.
    */
 
-  private def convertParagraphText(paragraphElements: List[ParagraphElement], outerFormatting: Set[SequenceFormatting] = Set()): List[IFormattedText] =
+  private def convertParagraphText(paragraphElements: List[ParagraphElement], context: Context, outerFormatting: Set[SequenceFormatting] = Set()): List[IFormattedText] =
     if (paragraphElements.isEmpty) Nil
-    else if (isComment(paragraphElements.head)) convertParagraphText(paragraphElements.tail)
-    else {
+    else if (isComment(paragraphElements.head)) convertParagraphText(paragraphElements.tail, context)
+    else if (paragraphElements.head.getFootnoteReference!=null) {
+     IFootnote(context.footnotes(paragraphElements.head.getFootnoteReference.getFootnoteId)) ::  convertParagraphText(paragraphElements.tail, context)
+    }    else {
       // if bold or italics, grab the longest subsequence with either formatting and process that recursively
       val longestSeqFormatting = sequenceFormattings.filterNot(outerFormatting.contains).filter(_.seqLength(paragraphElements) > 0).maxByOption(_.seqLength(paragraphElements))
       if (longestSeqFormatting.isDefined) {
         val (formattedHeads, tail) = longestSeqFormatting.get.split(paragraphElements)
         val formatter = longestSeqFormatting.get.getFormatter(paragraphElements.head)
-        formatter(convertParagraphText(formattedHeads, outerFormatting + longestSeqFormatting.get)) ++
-          convertParagraphText(tail, outerFormatting)
+        formatter(convertParagraphText(formattedHeads, context, outerFormatting + longestSeqFormatting.get)) ++
+          convertParagraphText(tail, context, outerFormatting)
       } else {
         // process plain text element at head by processing tail and adding plain text to the front (avoid sequence of two plaintext elements by merging them instead)
-        if (paragraphElements.head.getTextRun == null) convertParagraphText(paragraphElements.tail)
+        if (paragraphElements.head.getTextRun == null) convertParagraphText(paragraphElements.tail, context)
         else {
           val newText = cleanText(paragraphElements.head.getTextRun.getContent)
-          convertParagraphText(paragraphElements.tail, outerFormatting) match {
+          convertParagraphText(paragraphElements.tail, context, outerFormatting) match {
             case IPlainText(t) :: tail => IPlainText(newText + t) :: tail
             case e => IPlainText(newText) :: e
           }
@@ -311,6 +316,7 @@ class GDocParser {
     case (i: IPlainText) :: tail => i :: postprocessingTextFragments(tail)
     case (i: IReference) :: tail => i :: postprocessingTextFragments(tail)
     case (i: ICitation) :: tail => i :: postprocessingTextFragments(tail)
+    case (i: IFootnote) :: tail => i :: postprocessingTextFragments(tail)
     case IURL(link, inner) :: tail =>
       val newI = inner.map(postprocessingTextFragments)
       val newTail = postprocessingTextFragments(tail)
@@ -350,6 +356,9 @@ class GDocParser {
 
     val (bibliographyParagraphs, mainParagraphs) = paragraphs.partition(isPaperpileRef)
 
+    val footnotes: Map[String, List[IParagraph]] = getFootnotes(doc)
+    val context = Context(footnotes)
+
     var mainContent: List[IDocumentElement] = Nil
 
     def addParagraph(p: IParagraph, isBullet: Boolean): Unit = {
@@ -362,7 +371,7 @@ class GDocParser {
         }
     }
 
-    for (paragraph <- mainParagraphs.reverse; pe <- convertParagraph(doc, paragraph))
+    for (paragraph <- mainParagraphs.reverse; pe <- convertParagraph(doc, context, paragraph))
       pe match {
         case p: IParagraph if p.trimNonEmpty || p.indexTerms.nonEmpty =>
           val namedStyle = paragraph.getParagraphStyle.getNamedStyleType
@@ -389,10 +398,10 @@ class GDocParser {
 
     val bibitems: List[(String, IParagraph)] =
       for (bibitem <- bibliographyParagraphs;
-           p <- convertTextParagraph(doc, bibitem); if p.trimNonEmpty;
+           p <- convertTextParagraph(doc, context, bibitem); if p.trimNonEmpty;
            f = bibitem.getElements.asScala.toList.take(1).filter(hasPaperpileRefLink) ++ bibitem.getElements.asScala.toList.drop(1); if f.nonEmpty) yield {
         val id = getPaperpileRefLink(f.head).get
-        val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, Set())))
+        val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, context, Set())))
         (id, text)
       }
     if (bibitems.nonEmpty)
@@ -401,6 +410,12 @@ class GDocParser {
 
     IDocument(title, abstr, postprocessingDocumentElements(mainContent))
   }
+
+  private def getFootnotes(doc: Document): Map[String, List[IParagraph]] =
+    (Map() ++ doc.getFootnotes.asScala).view.mapValues(f=>{
+      val paragraphs = f.getContent.asScala.flatMap(se => Option(se.getParagraph)).toList
+      paragraphs.flatMap(p=>convertTextParagraph(doc, Context(Map()), p))
+    }).toMap
 
 
   //detect light gray background as indexed keywords

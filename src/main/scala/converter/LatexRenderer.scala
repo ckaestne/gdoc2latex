@@ -69,6 +69,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     case ICitation(refs) => "\\cite{" + refs.mkString(",") + "}"
     case IURL(link, None) => s"\\url{${link.replace("#", "\\#").replace("%", "\\%")}}"
     case IURL(link, Some(text)) => s"\\href{${link.replace("#","\\#").replace("%","\\%")}}{${renderText(text)}}"
+    case IFootnote(text) => s"\\footnote{${text.map(renderParagraph).mkString("\n\n")}}"
   }
 
   protected def formatIndexedTerm(term: String): String = term.trim
