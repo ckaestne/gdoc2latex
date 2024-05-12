@@ -1,19 +1,86 @@
 package edu.cmu.ckaestne.gdoc2latex.converter
 
-import com.google.api.services.docs.v1.model.{Document, Paragraph, ParagraphElement}
+import com.google.api.services.docs.v1.model.{Document, InlineObject, Paragraph, ParagraphElement}
 
+import scala.collection.convert.ImplicitConversions.`map AsScala`
 import scala.jdk.CollectionConverters._
 
 
 class GDocParser {
 
 
-  private def convertParagraph(doc: Document, context: Context, p: Paragraph): Option[IDocumentElement] =
+  def convert(doc: Document): IDocument = {
+    val body = doc.getBody
+    var title: IParagraph = IParagraph(List(IPlainText(Option(doc.getTitle).getOrElse(""))))
+    var abstr: Option[List[IParagraph]] = None
+
+    val paragraphs = body.getContent.asScala.flatMap(se => Option(se.getParagraph)).toList
+
+    val (bibliographyParagraphs, mainParagraphs) = paragraphs.partition(isPaperpileRef)
+
+    val inlineObjects = Map.from(doc.getInlineObjects)
+    val footnotes: Map[String, List[IParagraph]] = getFootnotes(doc)
+    val context = Context(inlineObjects, footnotes)
+
+    var mainContent: List[IDocumentElement] = Nil
+
+    def addParagraph(p: IParagraph, isBullet: Boolean): Unit = {
+      if (!isBullet)
+        mainContent ::= p
+      else
+        mainContent = mainContent match {
+          case IBulletList(ps) :: tail => IBulletList(p :: ps) :: tail
+          case e => IBulletList(List(p)) :: e
+        }
+    }
+
+    for (paragraph <- mainParagraphs.reverse; pe <- convertParagraph(context, paragraph))
+      pe match {
+        case p: IParagraph if p.trimNonEmpty || p.indexTerms.nonEmpty =>
+          val namedStyle = paragraph.getParagraphStyle.getNamedStyleType
+          val headingId = Option(paragraph.getParagraphStyle.getHeadingId)
+          if ("TITLE" == namedStyle)
+            title = p
+          else if ("HEADING_1" == namedStyle) {
+            mainContent ::= IHeading(1, headingId, p)
+          } else if ("HEADING_2" == namedStyle)
+            mainContent ::= IHeading(2, headingId, p)
+          else if ("HEADING_3" == namedStyle)
+            mainContent ::= IHeading(3, headingId, p)
+          else if ("NORMAL_TEXT" == namedStyle) {
+            if (p.plainText.startsWith("Abstract: "))
+              abstr = Some(List(p))
+            else
+              addParagraph(p, paragraph.getBullet != null)
+          } else {
+            System.err.println("unknown style: " + namedStyle)
+          }
+        case _: IParagraph =>
+        case i: IImage => mainContent ::= i
+      }
+
+    val bibitems: List[(String, IParagraph)] =
+      for (bibitem <- bibliographyParagraphs;
+           p <- convertTextParagraph(context, bibitem); if p.trimNonEmpty;
+           f = bibitem.getElements.asScala.toList.take(1).filter(hasPaperpileRefLink) ++ bibitem.getElements.asScala.toList.drop(1); if f.nonEmpty) yield {
+        val id = getPaperpileRefLink(f.head).get
+        val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, context, Set())))
+        (id, text)
+      }
+    if (bibitems.nonEmpty)
+      mainContent :+= IBibliography(bibitems)
+
+
+    IDocument(title, abstr, postprocessingDocumentElements(mainContent))
+  }
+
+
+  private def convertParagraph(context: Context, p: Paragraph): Option[IDocumentElement] =
     if (p.getElements == null) None
-    else extractImage(doc, p).orElse(
+    else extractImage(context, p).orElse(
       Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList, context)), findIndexTerms(p))))
 
-  private def convertTextParagraph(doc: Document, context: Context, p: Paragraph): Option[IParagraph] =
+  private def convertTextParagraph(context: Context, p: Paragraph): Option[IParagraph] =
     if (p.getElements == null) None
     else
       Some(IParagraph(postprocessingTextFragments(convertParagraphText(p.getElements.asScala.toList, context)), findIndexTerms(p)))
@@ -174,7 +241,7 @@ class GDocParser {
   private def cleanText(str: String) = str.replace("\n", "")
 
 
-  case class Context(footnotes: Map[String, List[IParagraph]])
+  case class Context(inlineObjects: Map[String, InlineObject], footnotes: Map[String, List[IParagraph]])
 
   /**
    * text convertion: italics, bold, and links/references/citations are recognized and need to start/stop at word boundaries. strikethrough is ignored as comment at the character level.
@@ -206,7 +273,7 @@ class GDocParser {
       }
     }
 
-  private def extractImage(doc: Document, p: Paragraph): Option[IImage] = {
+  private def extractImage(context: Context, p: Paragraph): Option[IImage] = {
     val inlineObjects = p.getElements.asScala.filter(_.getInlineObjectElement != null)
     if (inlineObjects.isEmpty) return None
     if (inlineObjects.size > 1) {
@@ -222,7 +289,7 @@ class GDocParser {
       return None
     }
     val objectId = inlineObjects.head.getInlineObjectElement.getInlineObjectId
-    val obj = doc.getInlineObjects.get(objectId)
+    val obj = context.inlineObjects(objectId)
     if (obj == null || obj.getInlineObjectProperties == null || obj.getInlineObjectProperties.getEmbeddedObject == null || obj.getInlineObjectProperties.getEmbeddedObject.getImageProperties == null) {
       System.err.println(s"Inline object $objectId not found or not an image: $obj")
       return None
@@ -347,74 +414,11 @@ class GDocParser {
     }
 
 
-  def convert(doc: Document): IDocument = {
-    val body = doc.getBody
-    var title: IParagraph = IParagraph(List(IPlainText(Option(doc.getTitle).getOrElse(""))))
-    var abstr: Option[List[IParagraph]] = None
-
-    val paragraphs = body.getContent.asScala.flatMap(se => Option(se.getParagraph)).toList
-
-    val (bibliographyParagraphs, mainParagraphs) = paragraphs.partition(isPaperpileRef)
-
-    val footnotes: Map[String, List[IParagraph]] = getFootnotes(doc)
-    val context = Context(footnotes)
-
-    var mainContent: List[IDocumentElement] = Nil
-
-    def addParagraph(p: IParagraph, isBullet: Boolean): Unit = {
-      if (!isBullet)
-        mainContent ::= p
-      else
-        mainContent = mainContent match {
-          case IBulletList(ps) :: tail => IBulletList(p :: ps) :: tail
-          case e => IBulletList(List(p)) :: e
-        }
-    }
-
-    for (paragraph <- mainParagraphs.reverse; pe <- convertParagraph(doc, context, paragraph))
-      pe match {
-        case p: IParagraph if p.trimNonEmpty || p.indexTerms.nonEmpty =>
-          val namedStyle = paragraph.getParagraphStyle.getNamedStyleType
-          val headingId = Option(paragraph.getParagraphStyle.getHeadingId)
-          if ("TITLE" == namedStyle)
-            title = p
-          else if ("HEADING_1" == namedStyle) {
-            mainContent ::= IHeading(1, headingId, p)
-          } else if ("HEADING_2" == namedStyle)
-            mainContent ::= IHeading(2, headingId, p)
-          else if ("HEADING_3" == namedStyle)
-            mainContent ::= IHeading(3, headingId, p)
-          else if ("NORMAL_TEXT" == namedStyle) {
-            if (p.plainText.startsWith("Abstract: "))
-              abstr = Some(List(p))
-            else
-              addParagraph(p, paragraph.getBullet != null)
-          } else {
-            System.err.println("unknown style: " + namedStyle)
-          }
-        case _: IParagraph =>
-        case i: IImage => mainContent ::= i
-      }
-
-    val bibitems: List[(String, IParagraph)] =
-      for (bibitem <- bibliographyParagraphs;
-           p <- convertTextParagraph(doc, context, bibitem); if p.trimNonEmpty;
-           f = bibitem.getElements.asScala.toList.take(1).filter(hasPaperpileRefLink) ++ bibitem.getElements.asScala.toList.drop(1); if f.nonEmpty) yield {
-        val id = getPaperpileRefLink(f.head).get
-        val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, context, Set())))
-        (id, text)
-      }
-    if (bibitems.nonEmpty)
-      mainContent :+= IBibliography(bibitems)
-
-
-    IDocument(title, abstr, postprocessingDocumentElements(mainContent))
-  }
 
   private def getFootnotes(doc: Document): Map[String, List[IParagraph]] =
     (Map() ++ doc.getFootnotes.asScala).view.mapValues(f=>{
       val paragraphs = f.getContent.asScala.flatMap(se => Option(se.getParagraph)).toList
-      paragraphs.flatMap(p=>convertTextParagraph(doc, Context(Map()), p))
+      paragraphs.flatMap(p=>convertTextParagraph(Context(Map(), Map()), p))
     }).toMap
 
 

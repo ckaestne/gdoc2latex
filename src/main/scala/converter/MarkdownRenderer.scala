@@ -13,7 +13,7 @@ import java.util
 
 class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = false, imgDir: File = new File("."), referenceDir: File = new File(".")/*img path will be relative to this dir*/, drawings: List[GDrawing] = Nil,
                        /*chapterURL: Option[String => Option[String]] = None, */imgRenderingFormat: String = "![$cap]($address)\n",codeWithCaptionRenderingFormat: String = "```$lang\n$code```\n*$cap*\n")
-    extends AbstractRenderer(drawings, imgDir){
+    extends AbstractRenderer(drawings){
 
   def render(doc: IDocument): String = {
     "# "+renderParagraph(doc.title)+"\n\n"+
@@ -66,8 +66,8 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
       if (downloadImages) {
         resolveImageUri(id, uri) match {
           case Some((filePath, content)) =>
-            Files.copy(content, filePath, StandardCopyOption.REPLACE_EXISTING)
-            address = "./"+referenceDir.toPath.relativize(filePath).toString
+            Files.copy(new ByteArrayInputStream(content), Path.of(filePath), StandardCopyOption.REPLACE_EXISTING)
+            address = "./"+referenceDir.toPath.relativize(Path.of(filePath)).toString
           case None => System.err.println("Cannot download image: "+uri)
         }
       }
