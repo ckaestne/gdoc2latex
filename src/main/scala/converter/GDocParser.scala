@@ -18,7 +18,7 @@ class GDocParser {
 
     val (bibliographyParagraphs, mainParagraphs) = paragraphs.partition(isPaperpileRef)
 
-    val inlineObjects = Map.from(doc.getInlineObjects)
+    val inlineObjects: Map[String, InlineObject] = if (doc.getInlineObjects==null) Map() else Map.from(doc.getInlineObjects)
     val footnotes: Map[String, List[IParagraph]] = getFootnotes(doc)
     val context = Context(inlineObjects, footnotes)
 
