@@ -224,7 +224,7 @@ class GDocParser {
         List(IReference(hlink))
       } else if (link != null && (link contains "paperpile.com/c/")) {
         val refs = link.drop(link.lastIndexOf("/") + 1).split("\\+")
-        List(ICitation(refs.toList))
+        List(ICitation(refs.toList, inner))
       } else {
         if (link == inner.map(_.getPlainText()).mkString)
           List(IURL(link, None))
@@ -416,6 +416,7 @@ class GDocParser {
 
 
   private def getFootnotes(doc: Document): Map[String, List[IParagraph]] =
+    if (doc.getFootnotes==null) Map() else
     (Map() ++ doc.getFootnotes.asScala).view.mapValues(f=>{
       val paragraphs = f.getContent.asScala.flatMap(se => Option(se.getParagraph)).toList
       paragraphs.flatMap(p=>convertTextParagraph(Context(Map(), Map()), p))

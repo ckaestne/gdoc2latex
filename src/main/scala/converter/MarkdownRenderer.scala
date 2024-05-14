@@ -37,7 +37,7 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
 //      val link = chapterURL.flatMap(_.apply(u.getPlainText()))
 //      link.map(l=>s"[${renderText(i)}]($l)").getOrElse(renderText(i))
     case IReference(i) => ??? //s"[$i]($i)"
-    case ICitation(refs) => ??? //"\\cite{" + refs.mkString(",") + "}"
+    case ICitation(refs, text) => ??? //"\\cite{" + refs.mkString(",") + "}"
     case IURL(link, None) => s"[$link]($link)"
     case IURL(link, Some(text)) => s"[${renderText(text)}]($link)"
     case IFootnote(text) => s"[Footnote: ${text.map(renderParagraph).mkString}]"

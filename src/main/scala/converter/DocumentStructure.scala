@@ -50,8 +50,8 @@ case class IReference(anchor: String) extends IFormattedText {
   def getPlainText() = "$REF"
 }
 
-case class ICitation(citations: List[String]) extends IFormattedText {
-  def getPlainText() = "$CITE"
+case class ICitation(citations: List[String], text: List[IFormattedText]) extends IFormattedText {
+  def getPlainText() = text.map(_.getPlainText()).mkString
 }
 
 case class IURL(link: String, inner: Option[List[IFormattedText]]) extends IFormattedText {
