@@ -92,8 +92,12 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
       val anchor = id.map(headingId => s"\\label{$headingId}").getOrElse("")
       (s"\\$l{${renderText(text.content)}}$anchor" + renderIndex(text.indexTerms), Map())
 
-    case IBulletList(bullets) =>
-      (bullets.map(renderElement).mkString(s"\\begin{$itemEnv}\n\t\\item ", "\n\t\\item ", s"\n\\end{$itemEnv}\n"), Map())
+    case IBulletList(bullets) => {
+      val items: List[(String, Map[String, Array[Byte]])] = bullets.map(renderElement)
+      val text = items.map(_._1).mkString(s"\\begin{$itemEnv}\n\t\\item ", "\n\t\\item ", s"\n\\end{$itemEnv}\n")
+      val files = items.map(_._2).reduce(_ ++ _)
+      (text, files)
+    }
 
 
     case IBibliography(items) =>
