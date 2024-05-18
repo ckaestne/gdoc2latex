@@ -158,6 +158,8 @@ object GDoc2LatexWorker {
     ))
       if (Files.exists(file))
         Files.delete(file)
+
+    GDocConnection.clearCache()
   }
 
 }
