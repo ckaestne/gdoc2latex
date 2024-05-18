@@ -79,7 +79,7 @@ case class IParagraph(content: List[IFormattedText], indexTerms: List[String]=Ni
 
 case class IBulletList(bullets: List[IParagraph]) extends IDocumentElement
 
-case class IBibliography(items: List[(String /*key*/ , IParagraph)]) extends IDocumentElement
+case class IBibliography(items: List[(String /*key*/ , String /*itemNrText*/, IParagraph)]) extends IDocumentElement
 
 case class IHeading(level: Int, id: Option[String], text: IParagraph) extends IDocumentElement
 

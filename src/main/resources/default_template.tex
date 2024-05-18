@@ -13,6 +13,16 @@
 \setcopyright{none}
 \renewcommand\footnotetextcopyrightpermission[1]{}
 
+\newcommand\gencite[2]{\cite{#1}}
+\newcommand\genbibitem[3]{\bibitem{#1} #3}
+
+%% alternatively for using natbib
+% \usepackage{natbib}
+% \newcommand\gencite[2]{#2}
+% \newcommand\genbibitem[3]{\bibitem[A(2020)] #3}
+
+
+
 \clubpenalty = 1
 \widowpenalty = 1
 \displaywidowpenalty = 1

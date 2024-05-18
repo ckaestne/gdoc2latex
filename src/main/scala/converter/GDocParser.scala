@@ -59,13 +59,14 @@ class GDocParser {
         case i: IImage => mainContent ::= i
       }
 
-    val bibitems: List[(String, IParagraph)] =
+    val bibitems: List[(String, String, IParagraph)] =
       for (bibitem <- bibliographyParagraphs;
            p <- convertTextParagraph(context, bibitem); if p.trimNonEmpty;
            f = bibitem.getElements.asScala.toList.take(1).filter(hasPaperpileRefLink) ++ bibitem.getElements.asScala.toList.drop(1); if f.nonEmpty) yield {
         val id = getPaperpileRefLink(f.head).get
+        val itemizeTextPlain = bibitem.getElements.asScala.take(1).filterNot(hasPaperpileRefLink).filter(_.getTextRun!=null).filter(_.getTextRun.getContent!=null).map(_.getTextRun.getContent).headOption.getOrElse("")
         val text = IParagraph(postprocessingTextFragments(convertParagraphText(f, context, Set())))
-        (id, text)
+        (id, itemizeTextPlain, text)
       }
     if (bibitems.nonEmpty)
       mainContent :+= IBibliography(bibitems)

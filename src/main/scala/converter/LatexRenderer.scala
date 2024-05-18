@@ -75,7 +75,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     //      println("    Link to Section \"" + u.getPlainText()+"\"")
     //      s"\\hyperref[${Util.textToId(u.getPlainText())}]{${renderText(List(IItalics(i)))}}"
     case IReference(i) => s"\\href{$i}"
-    case ICitation(refs, text) => "\\gencite{" + refs.mkString(",") + "}{"+text.map(_.getPlainText()).mkString+"}"
+    case ICitation(refs, text) => "\\gencite{" + renderPlainText(refs.mkString(",")) + "}{"+text.map(_.getPlainText()).mkString+"}"
     case IURL(link, None) => s"\\url{${link.replace("#", "\\#").replace("%", "\\%")}}"
     case IURL(link, Some(text)) => s"\\href{${link.replace("#", "\\#").replace("%", "\\%")}}{${renderText(text)}}"
     case IFootnote(text) => s"\\footnote{${text.map(renderParagraph).mkString("\n\n")}}"
@@ -97,7 +97,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
 
 
     case IBibliography(items) =>
-      (items.map(i => s"\\bibitem{${i._1}} ${renderText(i._2.content)}").mkString("\\begin{thebibliography}{100}\n", "\n", "\n\\end{thebibliography}\n"), Map())
+      (items.map(i => s"\\genbibitem{${i._1}}{${renderPlainText(i._2)}}{${renderText(i._3.content)}}").mkString("\\begin{thebibliography}{100}\n", "\n", "\n\\end{thebibliography}\n"), Map())
 
     case img@IImage(id: String, uri: String, caption: Option[IParagraph], altTextOption: Option[String], width: Int) => if (ignoreImages) ("", Map()) else {
       if (downloadImages) {
