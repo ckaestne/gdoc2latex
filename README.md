@@ -4,7 +4,7 @@ It’s time to move beyond writing Latex for most papers. Google Docs provides a
 
 This project converts Google Doc documents to Latex and onward to PDFs. The document is edited in Google Docs and a PDF version can be viewed in parallel in the required paper template to judge layout and length.
 
-## Features
+## Features (Latex)
 
 This project reads the formatting from Google Docs and converts it to Latex code. It supports the following functionality:
 
@@ -14,6 +14,10 @@ This project reads the formatting from Google Docs and converts it to Latex code
 * *Citations* are supported through [Paperpile](https://paperpile.com/). See details below.
 * *Strikethrough* formatting is considered as comments and omitted in Latex
 * *Headings* in GDoc are converted to `\section`, `\subsection`, and `\subsubsection` in Latex
+* *Footnotes* should work as expected
+* *Subfix* and *superfix* formatting renders as `$_\text{...}` and `$^\text{...}`
+* *Images* embedded in the document as the only element of a paragraph are downloaded as .png file and embedded in the Latex output with `\begin{figure}[h!tp]\centering\includegraphics[width=...]{...png}\caption{...}\alt{...}\end{figure}`. If the paragraph after the image is formatted in *italics* it is interpreted as the image caption. Alt text of the image in the Google doc is converted to `\alt{...}` if available. Images are scaled down relatively if they are scaled in the Google doc. 
+* Text with grey background color is interpreted as an *index* term and produces an `\index` entry. Text formatted grey and strikethrough will produce an index entry without having the text in the document too.
 * Internal links to section headers are converted to `\ref` references (the link text is discarded).
 * A heading formatted as *Title* replaces the `\TITLE` command in the Latex template
 * A paragraph starting with “Abstract:” is used as the abstract in the Latex template
@@ -22,7 +26,9 @@ This project reads the formatting from Google Docs and converts it to Latex code
 
 Additional formatting conversion could be added as needed.
 
-## Paperpile citations/references
+
+
+### Paperpile citations/references
 
 [Paperpile](https://paperpile.com/) can be used for citations. 
 Bibtex is not used, references and formatting entirely relies on Paperpile.
@@ -52,6 +58,10 @@ If for some reason the *natbib library needs to be included in the document, gen
 ```
 
 Only the first solution will create links within the document (if enabled). Creating links for other citation styles is not easily possible if multiple references may be used in the same citation, since Paperpile does not map references to individual text fragments of the citation and the text separators (brackets, commas or semicolons, etc) differ between citation styles. Some postprocessing of the keys and text in `\gencite` may be possible to pair them up for a given citation style. 
+
+## Markdown
+
+Conversion to markdown are also supported with mostly the same features as for Latex, but without section references, citations, images, and footnotes.
 
 
 ## Try it

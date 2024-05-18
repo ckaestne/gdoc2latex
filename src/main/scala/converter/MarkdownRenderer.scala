@@ -2,13 +2,9 @@ package edu.cmu.ckaestne.gdoc2latex.converter
 
 import converter.AbstractRenderer
 import edu.cmu.ckaestne.gdoc2latex.util.GDrawing
-import org.apache.commons.codec.digest.DigestUtils
-import org.apache.commons.io.IOUtils
 
-import java.io.{ByteArrayInputStream, File, InputStream}
-import java.net.URI
+import java.io.{ByteArrayInputStream, File}
 import java.nio.file.{Files, Path, StandardCopyOption}
-import java.util
 
 
 class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = false, imgDir: File = new File("."), referenceDir: File = new File(".")/*img path will be relative to this dir*/, drawings: List[GDrawing] = Nil,
@@ -36,8 +32,8 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
 //    case u@IUnderlined(i) =>
 //      val link = chapterURL.flatMap(_.apply(u.getPlainText()))
 //      link.map(l=>s"[${renderText(i)}]($l)").getOrElse(renderText(i))
-    case IReference(i) => ??? //s"[$i]($i)"
-    case ICitation(refs, text) => ??? //"\\cite{" + refs.mkString(",") + "}"
+    case IReference(i) => "" //s"[$i]($i)"
+    case ICitation(refs, text) => renderText(text) //"\\cite{" + refs.mkString(",") + "}"
     case IURL(link, None) => s"[$link]($link)"
     case IURL(link, Some(text)) => s"[${renderText(text)}]($link)"
     case IFootnote(text) => s"[Footnote: ${text.map(renderParagraph).mkString}]"
@@ -54,8 +50,8 @@ class MarkdownRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = f
       bullets.map(renderElement).mkString("  * ", "\n  * ", "\n")
 
 
-    case IBibliography(items) => ???
-    //      items.map(i => s"\\bibitem{${i._1}} ${renderText(i._2.content)}").mkString("\\begin{thebibliography}{100}\n", "\n", "\n\\end{thebibliography}\n")
+    case IBibliography(items) =>
+      items.map(i=>i._2+renderElement(i._3)).mkString("  * ", "\n  * ", "\n")
 
     case IImage(id: String, uri: String, caption: Option[IParagraph], altTextOption: Option[String], width: Int) => if (ignoreImages) "" else {
       val cap = caption.map(p => renderText(p.content)).getOrElse("")

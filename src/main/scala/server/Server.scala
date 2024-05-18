@@ -3,7 +3,7 @@ package edu.cmu.ckaestne.gdoc2latex.server
 import cask.Response
 import cask.model.StaticFile
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
-import edu.cmu.ckaestne.gdoc2latex.converter.{LatexContext, GDocParser, LatexInput, LatexRenderer}
+import edu.cmu.ckaestne.gdoc2latex.converter.{GDocParser, LatexContext, LatexInput, LatexRenderer, MarkdownRenderer}
 import edu.cmu.ckaestne.gdoc2latex.util.GDocConnection
 import scalatags.Text.all._
 
@@ -49,6 +49,19 @@ object GDoc2LatexWorker {
 
     val ldoc = new GDocParser().convert(doc)
     context.render(new LatexRenderer(ignoreImages = false, downloadImages = true).render(ldoc))
+  }
+
+  def getMarkdown(gdocId: GDocId): String = {
+    println(s"loading gdoc $gdocId")
+    val doc = GDocConnection.getDocument(gdocId.docId, Server.withSuggestions)
+
+    //keep raw json output from gdoc for debugging
+    gdocId.docId.synchronized {
+      Files.writeString(rawPath(gdocId), doc.toString)
+    }
+
+    val ldoc = new GDocParser().convert(doc)
+    new MarkdownRenderer().render(ldoc)
   }
 
   /**
@@ -123,8 +136,8 @@ object GDoc2LatexWorker {
         Files.deleteIfExists(pdfPath(gdocId))
       Files.write(texPath(gdocId), input.mainFileContent)
       Files.writeString(logPath(gdocId),
-        "> " + cmd1.mkString(" ") + " -- exit with "+exitCode1+ "\n\n" + out1 + "\n\n" +
-          "> " + cmd2.mkString(" ")+ " -- exit with "+exitCode2 + "\n\n" + out2)
+        "> " + cmd1.mkString(" ") + " -- exit with " + exitCode1 + "\n\n" + out1 + "\n\n" +
+          "> " + cmd2.mkString(" ") + " -- exit with " + exitCode2 + "\n\n" + out2)
       Files.writeString(errPath(gdocId), err1 + "\n\n" + err2)
     }
 
@@ -159,7 +172,6 @@ object GDoc2LatexWorker {
       if (Files.exists(file))
         Files.delete(file)
 
-    GDocConnection.clearCache()
   }
 
 }
@@ -186,8 +198,9 @@ case class Routes() extends cask.MainRoutes {
           li(tt("/update/$DOCID"), ": Converts and compiles the document, returning the PDF."),
           li(tt("/update/$DOCID/$TEMPLATEID"), ": Converts and compiles the document using the provided template file or directory, returning the PDF."),
           li(tt("/latex/$DOCID/$TEMPLATEID"), ": Shows the converted Latex document."),
-            li(tt("/log/$DOCID/$TEMPLATEID"), ": Shows the logs of the last pdflatex run of this document."),
-          li(tt("/pdf/$DOCID/$TEMPLATEID"), ": Returns the most recent PDF for this document, without updating it.")
+          li(tt("/log/$DOCID/$TEMPLATEID"), ": Shows the logs of the last pdflatex run of this document."),
+          li(tt("/pdf/$DOCID/$TEMPLATEID"), ": Returns the most recent PDF for this document, without updating it."),
+          li(tt("/md/$DOCID"), ": Shows the document as markdown.")
         )
       ),
       p("See the ", a("GitHub page", href := "https://github.com/ckaestne/gdoc2latex"), " of this project for more details.")
@@ -203,7 +216,7 @@ case class Routes() extends cask.MainRoutes {
         htmlResp("Error",
           h1("Cannot read requested document"),
           p("Error message: ", it(message), s", error code $code"),
-          p("Try making the document public or share it with ", tt(SERVICE_ACCOUNT_EMAIL),if (Server.withSuggestions) ". This server is configured to request all suggestions, the document needs to be shared in 'Commenter' mode or the server configuration needs to be changed." else "."))
+          p("Try making the document public or share it with ", tt(SERVICE_ACCOUNT_EMAIL), if (Server.withSuggestions) ". This server is configured to request all suggestions, the document needs to be shared in 'Commenter' mode or the server configuration needs to be changed." else "."))
       case e: Exception =>
         e.printStackTrace()
         Response("Failed " + e.getMessage, 400)
@@ -255,6 +268,7 @@ case class Routes() extends cask.MainRoutes {
   def clean(gdocId: String, templateId: String): Resp = handleErrors(() => {
     val id = GDocId.from(gdocId, templateId)
     GDoc2LatexWorker.clean(id)
+    GDocConnection.clearCache()
     htmlResp("Cleaned",
       h1(s"Cleaned all files for $gdocId"),
       p(a("build again", href := "/update/" + id.toParam))
@@ -299,6 +313,19 @@ case class Routes() extends cask.MainRoutes {
     returnLog(id)
   }
 
+  @cask.get("/md/:gdocId")
+  def md(gdocId: String): Resp = {
+    md(gdocId, "")
+  }
+
+  @cask.get("/md/:gdocId/:templateId")
+  def md(gdocId: String, _ignored: String): Resp = handleErrors(() => {
+    val id = GDocId.from(gdocId, "")
+    val markdown = GDoc2LatexWorker.getMarkdown(id)
+    htmlResp("Markdown",
+      pre(markdown)
+    )
+  })
 
   def returnLog(gdocId: GDocId): Resp = gdocId.docId.synchronized {
     val log = GDoc2LatexWorker.getLastLog(gdocId)
