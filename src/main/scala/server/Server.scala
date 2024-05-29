@@ -319,7 +319,7 @@ case class Routes() extends cask.MainRoutes {
   }
 
   @cask.get("/md/:gdocId/:templateId")
-  def md(gdocId: String, _ignored: String): Resp = handleErrors(() => {
+  def md(gdocId: String, templateId: String): Resp = handleErrors(() => {
     val id = GDocId.from(gdocId, "")
     val markdown = GDoc2LatexWorker.getMarkdown(id)
     htmlResp("Markdown",
