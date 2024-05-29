@@ -58,7 +58,8 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
       replace("∈", "$\\in$").
       replace("\u200A", " ").
       replace("\u000B", " ").
-      replace("—", "--")
+      replace("–", "--").
+      replace("—", "---")//– —
     //non-breaking space after some emoji
     getEmojiWithNbsp.foldLeft(x)((x, emoji) => x.replace(emoji + " ", emoji + "~"))
   }
