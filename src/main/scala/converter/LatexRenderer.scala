@@ -17,15 +17,19 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
   extends AbstractRenderer(drawings) {
 
 
+
   def render(doc: IDocument): LatexDoc = {
     val (latex, files) = renderContent(doc.content)
     LatexDoc(
       renderText(doc.title.content),
       doc.abstr.map(p => p.map(p => renderParagraph(p).replace("Abstract: ", "")).mkString("\n\n")).getOrElse(""),
-      latex,
+      finalRewriting(latex),
       files
     )
   }
+
+  protected def finalRewriting(renderedLatex: String): String =
+    renderedLatex.replace("\n\n\\textbf{","\n\n\\paragraph*{")
 
   private def renderContent(content: List[IDocumentElement]) = {
     content.map(renderElement).reduce((a, b) => (a._1 + "\n" + b._1, a._2 ++ b._2))
