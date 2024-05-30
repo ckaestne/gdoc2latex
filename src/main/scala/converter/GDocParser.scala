@@ -47,6 +47,12 @@ class GDocParser {
             mainContent ::= IHeading(2, headingId, p)
           else if ("HEADING_3" == namedStyle)
             mainContent ::= IHeading(3, headingId, p)
+          else if ("HEADING_4" == namedStyle)
+            mainContent ::= IHeading(4, headingId, p)
+          else if ("HEADING_5" == namedStyle)
+            mainContent ::= IHeading(5, headingId, p)
+          else if ("HEADING_6" == namedStyle)
+            mainContent ::= IHeading(6, headingId, p)
           else if ("NORMAL_TEXT" == namedStyle) {
             if (p.plainText.startsWith("Abstract: "))
               abstr = Some(List(p))

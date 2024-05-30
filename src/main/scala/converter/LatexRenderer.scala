@@ -89,7 +89,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
   protected def renderElement(t: IDocumentElement): (String, Map[String, Array[Byte]]) = t match {
     case IParagraph(c, idx) => (renderIndex(idx) + renderText(c) + "\n", Map())
     case IHeading(level, id, text) =>
-      val l = if (level == 1) "section" else if (level == 2) "subsection" else "subsubsection"
+      val l = "sub".repeat(level-1)+"section"
       val anchor = id.map(headingId => s"\\label{$headingId}").getOrElse("")
       (s"\\$l{${renderText(text.content)}}$anchor" + renderIndex(text.indexTerms), Map())
 

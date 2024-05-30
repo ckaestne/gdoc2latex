@@ -14,6 +14,7 @@ This project reads the formatting from Google Docs and converts it to Latex code
 * *Citations* are supported through [Paperpile](https://paperpile.com/). See details below.
 * *Strikethrough* formatting is considered as comments and omitted in Latex
 * *Headings* in GDoc are converted to `\section`, `\subsection`, and `\subsubsection` in Latex
+* *Headings* in GDoc are converted to `\section`, `\subsection`, and `\subsubsection` in Latex (up to 6 levels deep) -- to use `\subsubsubsubsection` etc they need to be defined in most latex templates. To use chapters in books, [redefine macros](https://tex.stackexchange.com/questions/101693/how-to-redefine-a-command-properly-to-avoid-recursive-call-to-itself) (eg. `\section` to `\chapter`, `\subsection` to `\section` etc.)
 * *Footnotes* should work as expected
 * *Subfix* and *superfix* formatting renders as `$_\text{...}` and `$^\text{...}`
 * *Images* embedded in the document as the only element of a paragraph are downloaded as .png file and embedded in the Latex output with `\begin{figure}[h!tp]\centering\includegraphics[width=...]{...png}\caption{...}\alt{...}\end{figure}`. If the paragraph after the image is formatted in *italics* it is interpreted as the image caption. Alt text of the image in the Google doc is converted to `\alt{...}` if available. Images are scaled down relatively if they are scaled in the Google doc. 
