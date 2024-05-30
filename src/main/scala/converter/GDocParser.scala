@@ -102,7 +102,7 @@ class GDocParser {
       var result = 1
       val head = seq.head
       var tail = seq.tail
-      while (tail.nonEmpty && tail.head.getTextRun.getContent != "\n" && continuesFormatting(head, tail.head)) {
+      while (tail.nonEmpty && tail.head.getTextRun!=null && tail.head.getTextRun.getContent != "\n" && continuesFormatting(head, tail.head)) {
         result += 1
         tail = tail.tail
       }
