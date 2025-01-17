@@ -76,7 +76,7 @@ object GDoc2LatexCLI extends App {
 
 
   private def doMarkdown(config: Config, ldoc: IDocument): Unit = {
-    val md = new MarkdownRenderer().render(ldoc)
+    val (md, _) = new MarkdownRenderer().render(ldoc)
 
     if (config.out.isDefined) {
       val outFilePath = config.out.get.toPath

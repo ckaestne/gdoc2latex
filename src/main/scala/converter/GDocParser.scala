@@ -56,7 +56,11 @@ class GDocParser {
           else if ("NORMAL_TEXT" == namedStyle) {
             if (p.plainText.startsWith("Abstract: "))
               abstr = Some(List(p))
-            else
+            else if (p.content.size>1 && p.content.head.isInstanceOf[IBold] && Set(".","?").exists(p.content.head.getPlainText().trim.endsWith) && paragraph.getBullet == null) {
+              //paragraph (not in bullet list) starting with bold text, which ends with a "." is interpreted as \paragraph section (encoded as IHeading level 10)
+              addParagraph(p.copy(content = p.content.tail), false)
+              mainContent ::= IHeading(10, None, IParagraph(p.content.head.asInstanceOf[IBold].elements))
+            } else
               addParagraph(p, paragraph.getBullet != null)
           } else {
             System.err.println("unknown style: " + namedStyle)

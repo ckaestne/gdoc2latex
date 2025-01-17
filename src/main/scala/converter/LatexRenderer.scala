@@ -23,13 +23,11 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     LatexDoc(
       renderText(doc.title.content),
       doc.abstr.map(p => p.map(p => renderParagraph(p).replace("Abstract: ", "")).mkString("\n\n")).getOrElse(""),
-      finalRewriting(latex),
+      latex,
       files
     )
   }
 
-  protected def finalRewriting(renderedLatex: String): String =
-    renderedLatex.replace("\n\n\\textbf{","\n\n\\paragraph*{")
 
   private def renderContent(content: List[IDocumentElement]) = {
     content.map(renderElement).reduce((a, b) => (a._1 + "\n" + b._1, a._2 ++ b._2))
@@ -93,7 +91,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
   protected def renderElement(t: IDocumentElement): (String, Map[String, Array[Byte]]) = t match {
     case IParagraph(c, idx) => (renderIndex(idx) + renderText(c) + "\n", Map())
     case IHeading(level, id, text) =>
-      val l = "sub".repeat(level-1)+"section"
+      val l = if (level==10) "paragraph" else "sub".repeat(level-1)+"section"
       val anchor = id.map(headingId => s"\\label{$headingId}").getOrElse("")
       (s"\\$l{${renderText(text.content)}}$anchor" + renderIndex(text.indexTerms), Map())
 

@@ -61,7 +61,7 @@ object GDoc2LatexWorker {
     }
 
     val ldoc = new GDocParser().convert(doc)
-    new MarkdownRenderer().render(ldoc)
+    new MarkdownRenderer().render(ldoc)._1
   }
 
   /**
