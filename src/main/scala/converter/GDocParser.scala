@@ -234,8 +234,7 @@ class GDocParser {
       if (hlink != null) {
         List(IReference(hlink))
       } else if (link != null && (link contains "paperpile.com/c/")) {
-        val refs = link.drop(link.lastIndexOf("/") + 1).split("\\+")
-        List(ICitation(refs.toList, inner))
+        new PaperpileConverter().convertLink(link, inner)
       } else {
         if (link == inner.map(_.getPlainText()).mkString)
           List(IURL(link, None))

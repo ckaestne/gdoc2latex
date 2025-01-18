@@ -78,7 +78,7 @@ class LatexRenderer(ignoreImages: Boolean = true, downloadImages: Boolean = fals
     //      println("    Link to Section \"" + u.getPlainText()+"\"")
     //      s"\\hyperref[${Util.textToId(u.getPlainText())}]{${renderText(List(IItalics(i)))}}"
     case IReference(i) => s"\\href{$i}"
-    case ICitation(refs, text) => "\\gencite{" + renderPlainText(refs.mkString(",")) + "}{"+text.map(_.getPlainText()).mkString+"}"
+    case ICitation(refs, text, prefix) => "\\gencite{" + renderPlainText(refs.mkString(",")) + "}{"+text.map(_.getPlainText()).mkString+"}{"+renderPlainText(prefix.getOrElse(""))+"}"
     case IURL(link, None) => s"\\url{${link.replace("#", "\\#").replace("%", "\\%")}}"
     case IURL(link, Some(text)) => s"\\href{${link.replace("#", "\\#").replace("%", "\\%")}}{${renderText(text)}}"
     case IFootnote(text) => s"\\footnote{${text.map(renderParagraph).mkString("\n\n")}}"
